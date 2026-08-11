@@ -1,0 +1,40 @@
+# --- Python ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.pyc
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+venv/
+.venv/
+env/
+
+# --- Node / Next.js -------------------------------------------------------
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+
+# --- Environment ----------------------------------------------------------
+# Real secrets live in backend/.env and never enter version control.
+# backend/.env.example is committed as the template.
+.env
+.env.local
+.env.*.local
+
+# --- OS / editor ----------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# --- Data -----------------------------------------------------------------
+# NOTE: data/*.db is deliberately NOT ignored. The SQLite database built by the
+# ETL step is committed to the repository so the application deploys with zero
+# infrastructure - no database server to provision, no build step on the host.
+# Do not add data/*.db or data/quickbite.db here.
+
+# --- Claude Code (local tooling state) ---
+.claude/
