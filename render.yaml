@@ -1,0 +1,50 @@
+# Render blueprint for the QuickBite Agentic Analytics API.
+#
+# Deploy with: Render dashboard -> New -> Blueprint -> pick this repository.
+# Render reads this file and provisions the service; see docs/DEPLOYMENT.md.
+#
+# The SQLite database is committed to the repository, so there is no database
+# service to provision and no migration step. The app is stateless and read-only
+# against a file that ships with the code.
+
+services:
+  - type: web
+    name: quickbite-analytics-api
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # Render injects $PORT and expects the process to bind 0.0.0.0 on it.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.13
+
+      - key: ENVIRONMENT
+        # Set in the dashboard: "production".
+        sync: false
+
+      - key: CORS_ORIGINS
+        # Set in the dashboard AFTER the frontend is deployed, as a
+        # comma-separated list, e.g.
+        #   https://quickbite-analytics.vercel.app,http://localhost:3000
+        # See the circular dependency section of docs/DEPLOYMENT.md.
+        sync: false
+
+      - key: LOG_LEVEL
+        value: INFO
+
+      # LLM provider keys. All optional and all secret, so none are committed;
+      # set whichever you have in the dashboard. The app starts without them and
+      # /health reports an empty providers_configured list.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROK_API_KEY
+        sync: false

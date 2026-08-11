@@ -12,10 +12,13 @@ never ``date.today()``. Every relative time expression ("last 3 months",
 clock would place every window outside the data and return empty results.
 """
 
+import json
 from datetime import date
 from pathlib import Path
+from typing import Annotated, Any
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # Filesystem anchors resolved from this file's location so that every path is
 # absolute and correct regardless of the process's current working directory.
@@ -108,11 +111,48 @@ class Settings(BaseSettings):
     APP_NAME: str = "QuickBite Agentic Analytics"
     APP_VERSION: str = "0.1.0"
     ENVIRONMENT: str = "development"
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+
+    # Browser origins allowed to call the API. NoDecode disables the default
+    # JSON parsing so a plain comma-separated string works: hosting dashboards
+    # take flat strings, and a bare URL would otherwise fail JSON decoding and
+    # crash the app at import. See the validator below.
+    CORS_ORIGINS: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
+
+    # Port the server binds to. Hosting platforms inject this.
+    PORT: int = 8000
+
+    # Root logging level.
+    LOG_LEVEL: str = "INFO"
 
     # Safety rails for generated SQL.
     MAX_QUERY_ROWS: int = 1000
     QUERY_TIMEOUT_SECONDS: int = 10
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: Any) -> list[str]:
+        """Accept CORS origins as a comma-separated string or a JSON array.
+
+        Hosting dashboards (Render, Vercel) store environment variables as flat
+        strings, so the common case is ``https://a.example,https://b.example``.
+        A JSON array is still accepted for backwards compatibility.
+
+        Args:
+            value: The raw value from the environment, a .env file or a default.
+
+        Returns:
+            The origins as a list, with blanks and surrounding whitespace
+            stripped.
+        """
+        if isinstance(value, str):
+            text = value.strip()
+            if text.startswith("["):
+                value = json.loads(text)
+            else:
+                return [origin.strip() for origin in text.split(",") if origin.strip()]
+        if isinstance(value, (list, tuple)):
+            return [str(origin).strip() for origin in value if str(origin).strip()]
+        raise ValueError(f"cannot parse CORS_ORIGINS from {value!r}")
 
     model_config = SettingsConfigDict(
         # Absolute path so the .env file is found no matter where the process
