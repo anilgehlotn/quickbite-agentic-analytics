@@ -47,6 +47,12 @@ SHEET_ORDER_DETAILS: Final[str] = "Order_Details"
 # Value of dim_calendar.day_type that marks a non-working day. Anything else is
 # a weekday.
 WEEKEND_DAY_TYPE: Final[str] = "Weekend"
+WEEKDAY_DAY_TYPE: Final[str] = "Weekday"
+DAY_TYPES: Final[tuple[str, ...]] = (WEEKDAY_DAY_TYPE, WEEKEND_DAY_TYPE)
+
+# Value of festive_period on ordinary days. The festive values themselves live
+# in settings.FESTIVE_PERIODS.
+NON_FESTIVE_PERIOD: Final[str] = "Normal"
 
 # --- Formatting ------------------------------------------------------------
 BYTES_PER_MB: Final[int] = 1024 * 1024
@@ -684,6 +690,7 @@ def build_database(
     excel_path: Path | None = None,
     db_path: Path | None = None,
     verbose: bool = True,
+    validate: bool = True,
 ) -> dict[str, int]:
     """Build the complete star schema from the source workbook.
 
@@ -692,13 +699,21 @@ def build_database(
     then the aggregate marts, then the indexes. Re-running is safe and produces
     an identical database.
 
+    The quality gate runs at the end of every build, so a database that fails
+    validation is never handed downstream silently.
+
     Args:
         excel_path: Source workbook. Defaults to ``settings.EXCEL_PATH``.
         db_path: Destination SQLite file. Defaults to ``settings.DB_PATH``.
-        verbose: Whether to print the build summary to stdout.
+        verbose: Whether to print the build summary and quality report.
+        validate: Whether to run the quality gate after building.
 
     Returns:
         Mapping of table name to the number of rows it holds.
+
+    Raises:
+        QualityCheckError: If ``validate`` is set and any error-severity
+            quality check fails.
     """
     source = excel_path or settings.EXCEL_PATH
     destination = db_path or settings.DB_PATH
@@ -742,7 +757,40 @@ def build_database(
     finally:
         connection.close()
 
+    if validate:
+        run_quality_gate(destination, verbose=verbose)
+
     return row_counts
+
+
+def run_quality_gate(db_path: Path, verbose: bool = True) -> None:
+    """Validate a freshly built database and fail the build if it is unsound.
+
+    The import is deferred because ``quality_checks`` imports this module for
+    its table list and domain vocabulary; keeping the import local avoids a
+    circular import at module load.
+
+    Args:
+        db_path: Database to validate.
+        verbose: Whether to print the full quality report.
+
+    Raises:
+        QualityCheckError: If any error-severity check fails.
+    """
+    from app.etl.quality_checks import (
+        QualityCheckError,
+        print_report,
+        run_quality_checks,
+    )
+
+    report = run_quality_checks(db_path)
+    if verbose:
+        print_report(report)
+    if not report.passed:
+        failures = "; ".join(check.name for check in report.failures())
+        raise QualityCheckError(
+            f"quality gate failed with {report.error_count} error(s): {failures}"
+        )
 
 
 def main() -> None:
