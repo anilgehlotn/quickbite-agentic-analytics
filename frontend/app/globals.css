@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * QuickBite palette.
+ *
+ * A warm dark neutral base with a single amber accent. The neutrals carry a
+ * slight red/yellow bias rather than the blue bias of default Tailwind gray,
+ * which keeps the surface sympathetic to a food brand and stops the page
+ * reading as an untouched template. Exactly one accent hue is used, reserved
+ * for interactive and emphatic elements so it retains meaning.
+ */
+:root {
+  --color-base: #100f0d;
+  --color-surface: #171513;
+  --color-raised: #1f1c19;
+  --color-border: #2b2723;
+  --color-ink: #f4f1ec;
+  --color-muted: #a49d94;
+  --color-faint: #6f6862;
+  --color-accent: #e5893f;
+  --color-accent-soft: rgba(229, 137, 63, 0.12);
+  --color-positive: #6fae7a;
+  --color-caution: #d9a441;
+  --color-negative: #cf6b5b;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-base);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* A faint warm bloom behind the fold, so the page has depth without ornament. */
+.page-glow {
+  background-image: radial-gradient(
+    60rem 32rem at 50% -12rem,
+    rgba(229, 137, 63, 0.09),
+    transparent 70%
+  );
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 1.8s ease-in-out infinite;
+}
