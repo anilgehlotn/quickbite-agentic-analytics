@@ -112,10 +112,13 @@ class Settings(BaseSettings):
     # today will eventually 404. Every one is env-overridable specifically so a
     # stale default can be corrected from the hosting dashboard without a code
     # change or redeploy of the image.
+    # Where a provider publishes a floating "latest" alias, prefer it: a pinned
+    # version is a dated default that eventually 404s, and a 404 is a permanent
+    # failure that silently drops the provider out of the failover chain.
     ANTHROPIC_MODEL: str = "claude-opus-5"
     OPENAI_MODEL: str = "gpt-4o"
-    GEMINI_MODEL: str = "gemini-2.0-flash"
-    GROK_MODEL: str = "grok-2-latest"
+    GEMINI_MODEL: str = "gemini-flash-latest"
+    GROK_MODEL: str = "grok-4-latest"
 
     # Per-request budget and determinism. Analytics answers must be
     # reproducible, so the default temperature is 0.

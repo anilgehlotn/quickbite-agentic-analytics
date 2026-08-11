@@ -959,9 +959,6 @@ class LLMClient:
     ) -> Any:
         """Complete a prompt and parse the response as JSON.
 
-        Appends a JSON-only instruction to the system prompt, strips markdown
-        fences from the reply and decodes it.
-
         Args:
             system: System prompt; the JSON instruction is appended to it.
             user: User message.
@@ -970,6 +967,38 @@ class LLMClient:
 
         Returns:
             The decoded JSON value.
+
+        Raises:
+            LLMJSONError: If the response is not valid JSON.
+            LLMError: If every provider failed.
+        """
+        value, _ = await self.complete_json_with_response(
+            system=system, user=user, max_tokens=max_tokens, temperature=temperature
+        )
+        return value
+
+    async def complete_json_with_response(
+        self,
+        system: str,
+        user: str,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> tuple[Any, LLMResponse]:
+        """Complete a prompt as JSON, also returning the raw response.
+
+        Appends a JSON-only instruction to the system prompt, strips markdown
+        fences from the reply and decodes it. Callers that need the token
+        counts and provider for a trace use this; callers that only want the
+        value use :meth:`complete_json`.
+
+        Args:
+            system: System prompt; the JSON instruction is appended to it.
+            user: User message.
+            max_tokens: Maximum tokens to generate. Defaults to settings.
+            temperature: Sampling temperature. Defaults to settings.
+
+        Returns:
+            The decoded JSON value and the completion that produced it.
 
         Raises:
             LLMJSONError: If the response is not valid JSON. The error carries
@@ -984,7 +1013,7 @@ class LLMClient:
         )
         cleaned = strip_code_fences(response.text)
         try:
-            return json.loads(cleaned)
+            return json.loads(cleaned), response
         except json.JSONDecodeError as error:
             logger.error(
                 "llm_json_parse_failed",
