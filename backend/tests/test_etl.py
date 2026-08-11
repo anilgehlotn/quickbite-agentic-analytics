@@ -19,36 +19,19 @@ from typing import Any, Iterator
 import pytest
 
 from app.config import settings
-from app.etl.build_db import build_database
+from app.etl.build_db import NON_FESTIVE_PERIOD, WEEKEND_DAY_TYPE, build_database
 
-# Expected row counts, taken from the dataset's README sheet.
-EXPECTED_ROW_COUNTS: dict[str, int] = {
-    "dim_store": 50,
-    "dim_product": 30,
-    "dim_customer": 5_000,
-    "dim_promotion": 6,
-    "dim_calendar": 365,
-    "fact_orders": 20_000,
-    "fact_order_lines": 49_834,
-}
-
-# Orders with no identified customer (anonymous walk-ins).
-EXPECTED_ANONYMOUS_ORDERS: int = 5_664
-
-# Orders with a promotion applied; NULL is the normal case for the rest.
-EXPECTED_PROMO_ORDERS: int = 840
-
-# The dataset spans exactly twelve calendar months.
-EXPECTED_MONTH_COUNT: int = 12
-
-# Value of festive_period on non-festive days.
-NON_FESTIVE_PERIOD: str = "Normal"
-
-# Tolerance, in INR, when reconciling mart totals against the order fact.
-REVENUE_TOLERANCE_INR: float = 1.0
-
-# SQLite GLOB pattern matching a 'YYYY-MM' month key.
-MONTH_KEY_GLOB: str = "[0-9][0-9][0-9][0-9]-[0-9][0-9]"
+# The dataset's expected shape and the reconciliation tolerances live with the
+# quality gate, which is their production home; the tests assert against the
+# same constants rather than restating them.
+from app.etl.quality_checks import (
+    EXPECTED_ANONYMOUS_ORDERS,
+    EXPECTED_MONTH_COUNT,
+    EXPECTED_PROMO_ORDERS,
+    EXPECTED_ROW_COUNTS,
+    MONTH_KEY_GLOB,
+    REVENUE_TOLERANCE_INR,
+)
 
 # Tables carrying a month_key column.
 MONTH_KEY_TABLES: tuple[str, ...] = (
@@ -351,11 +334,11 @@ class TestDerivedColumns:
         """is_weekend is 1 exactly when day_type is 'Weekend'."""
         for table in ("dim_calendar", "fact_orders"):
             assert (
-                scalar(
-                    connection,
+                connection.execute(
                     f"SELECT COUNT(*) FROM {table} "
-                    "WHERE is_weekend != (day_type = 'Weekend')",
-                )
+                    "WHERE is_weekend != (day_type = ?)",
+                    (WEEKEND_DAY_TYPE,),
+                ).fetchone()[0]
                 == 0
             ), table
 
