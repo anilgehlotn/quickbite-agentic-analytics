@@ -105,6 +105,29 @@ class Settings(BaseSettings):
     LLM_PROVIDER_ORDER: list[str] = ["anthropic", "openai", "gemini", "grok"]
 
     # ------------------------------------------------------------------
+    # LLM models and runtime
+    # ------------------------------------------------------------------
+    # Model IDs are deployment configuration, not constants. Providers release
+    # and retire models on their own schedules, so a default that is current
+    # today will eventually 404. Every one is env-overridable specifically so a
+    # stale default can be corrected from the hosting dashboard without a code
+    # change or redeploy of the image.
+    ANTHROPIC_MODEL: str = "claude-opus-5"
+    OPENAI_MODEL: str = "gpt-4o"
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GROK_MODEL: str = "grok-2-latest"
+
+    # Per-request budget and determinism. Analytics answers must be
+    # reproducible, so the default temperature is 0.
+    LLM_MAX_TOKENS: int = 4096
+    LLM_TEMPERATURE: float = 0.0
+
+    # Per-request timeout, and retry policy for transient provider failures.
+    LLM_TIMEOUT_SECONDS: int = 60
+    LLM_MAX_RETRIES: int = 2
+    LLM_RETRY_BACKOFF_SECONDS: float = 0.5
+
+    # ------------------------------------------------------------------
     # Application settings
     # ------------------------------------------------------------------
 
