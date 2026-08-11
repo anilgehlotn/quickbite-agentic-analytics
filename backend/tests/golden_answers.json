@@ -1,0 +1,3294 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-11T16:37:39.488582+00:00",
+    "source_file": "QSR_Agentic_Insights_Dataset.xlsx",
+    "source_path": "/Users/apple/Desktop/quickbite-agentic-analytics/quickbite-agentic-analytics/data/QSR_Agentic_Insights_Dataset.xlsx",
+    "computed_from": "Excel workbook via pandas - an independent path that never reads the SQLite database, the ETL module or the semantic layer",
+    "data_asof_date": "2026-07-31",
+    "data_start_date": "2025-08-01",
+    "analysis_window": {
+      "start": "2026-05-01",
+      "end": "2026-07-31",
+      "months": [
+        "2026-05",
+        "2026-06",
+        "2026-07"
+      ]
+    },
+    "revenue_metric": "net_before_tax",
+    "revenue_metric_note": "Revenue means NET_BEFORE_TAX, excluding the 5% tax carried in NET_REVENUE.",
+    "grain_rule": "Revenue, order counts and AOV come from the Orders sheet (order grain). SKU, product and category figures come from Order_Details (line grain). About 216 orders have line values that do not sum to their header NET_BEFORE_TAX, so the two grains differ by roughly 0.11% of revenue. The order grain is canonical; only Q4 reports line-grain revenue and says so.",
+    "null_handling": "All joins are left joins. The 5,664 orders with a NULL CUSTOMER_ID are anonymous walk-ins and are never dropped."
+  },
+  "context": {
+    "full_year": {
+      "revenue_net_inr": 12963837.7,
+      "orders": 20000,
+      "aov_inr": 648.19,
+      "units": 54760,
+      "units_per_order": 2.74,
+      "revenue_with_tax_inr": 13612030.05,
+      "gross_revenue_inr": 13034686.5,
+      "discount_inr": 70848.8
+    },
+    "monthly_revenue": [
+      {
+        "MONTH_KEY": "2025-08",
+        "orders": 1724,
+        "revenue_net_inr": 1108535.0,
+        "units": 4663,
+        "aov_inr": 643.0,
+        "festive_periods": []
+      },
+      {
+        "MONTH_KEY": "2025-09",
+        "orders": 1754,
+        "revenue_net_inr": 1132165.0,
+        "units": 4788,
+        "aov_inr": 645.48,
+        "festive_periods": [
+          "Pujo"
+        ]
+      },
+      {
+        "MONTH_KEY": "2025-10",
+        "orders": 1906,
+        "revenue_net_inr": 1226305.0,
+        "units": 5169,
+        "aov_inr": 643.39,
+        "festive_periods": [
+          "Diwali",
+          "Pujo"
+        ]
+      },
+      {
+        "MONTH_KEY": "2025-11",
+        "orders": 1700,
+        "revenue_net_inr": 1122790.0,
+        "units": 4745,
+        "aov_inr": 660.46,
+        "festive_periods": []
+      },
+      {
+        "MONTH_KEY": "2025-12",
+        "orders": 1686,
+        "revenue_net_inr": 1098527.2,
+        "units": 4627,
+        "aov_inr": 651.56,
+        "festive_periods": [
+          "New Year"
+        ]
+      },
+      {
+        "MONTH_KEY": "2026-01",
+        "orders": 1631,
+        "revenue_net_inr": 1062181.0,
+        "units": 4450,
+        "aov_inr": 651.25,
+        "festive_periods": [
+          "New Year"
+        ]
+      },
+      {
+        "MONTH_KEY": "2026-02",
+        "orders": 1430,
+        "revenue_net_inr": 903346.5,
+        "units": 3873,
+        "aov_inr": 631.71,
+        "festive_periods": []
+      },
+      {
+        "MONTH_KEY": "2026-03",
+        "orders": 1688,
+        "revenue_net_inr": 1092286.5,
+        "units": 4635,
+        "aov_inr": 647.09,
+        "festive_periods": []
+      },
+      {
+        "MONTH_KEY": "2026-04",
+        "orders": 1551,
+        "revenue_net_inr": 1020625.0,
+        "units": 4271,
+        "aov_inr": 658.04,
+        "festive_periods": []
+      },
+      {
+        "MONTH_KEY": "2026-05",
+        "orders": 1643,
+        "revenue_net_inr": 1052233.5,
+        "units": 4460,
+        "aov_inr": 640.43,
+        "festive_periods": []
+      },
+      {
+        "MONTH_KEY": "2026-06",
+        "orders": 1599,
+        "revenue_net_inr": 1041607.5,
+        "units": 4433,
+        "aov_inr": 651.41,
+        "festive_periods": []
+      },
+      {
+        "MONTH_KEY": "2026-07",
+        "orders": 1688,
+        "revenue_net_inr": 1103235.5,
+        "units": 4646,
+        "aov_inr": 653.58,
+        "festive_periods": []
+      }
+    ],
+    "peak_month": "2025-10",
+    "peak_revenue_inr": 1226305.0,
+    "trough_month": "2026-02",
+    "trough_revenue_inr": 903346.5,
+    "peak_to_trough_ratio": 1.36,
+    "seasonality_note": "Revenue peaks in 2025-10 (1,226,305.00 INR, festive) and troughs in 2026-02 (903,346.50 INR), a 1.36x spread. Any decline claim must be read against this seasonal shape, not treated as evidence of a problem on its own."
+  },
+  "q1": {
+    "question": "What was our total revenue, order count and AOV in the last 3 months?",
+    "window": {
+      "start": "2026-05-01",
+      "end": "2026-07-31"
+    },
+    "grain": "order",
+    "revenue_net_inr": 3197076.5,
+    "orders": 4930,
+    "aov_inr": 648.49,
+    "units": 13539,
+    "units_per_order": 2.75,
+    "revenue_with_tax_inr": 3356930.68,
+    "gross_revenue_inr": 3207651.5,
+    "discount_inr": 10575.0,
+    "monthly": [
+      {
+        "MONTH_KEY": "2026-05",
+        "orders": 1643,
+        "revenue_net_inr": 1052233.5,
+        "revenue_with_tax_inr": 1104845.27,
+        "units": 4460,
+        "aov_inr": 640.43,
+        "units_per_order": 2.71
+      },
+      {
+        "MONTH_KEY": "2026-06",
+        "orders": 1599,
+        "revenue_net_inr": 1041607.5,
+        "revenue_with_tax_inr": 1093687.99,
+        "units": 4433,
+        "aov_inr": 651.41,
+        "units_per_order": 2.77
+      },
+      {
+        "MONTH_KEY": "2026-07",
+        "orders": 1688,
+        "revenue_net_inr": 1103235.5,
+        "revenue_with_tax_inr": 1158397.42,
+        "units": 4646,
+        "aov_inr": 653.58,
+        "units_per_order": 2.75
+      }
+    ]
+  },
+  "q2": {
+    "question": "Which stores are performing best and worst by revenue in the last 3 months?",
+    "window": {
+      "start": "2026-05-01",
+      "end": "2026-07-31"
+    },
+    "grain": "order",
+    "store_count": 50,
+    "total_revenue_inr": 3197076.5,
+    "top_5": [
+      {
+        "STORE_ID": "ST004",
+        "STORE_NAME": "QuickBite Gurugram 04",
+        "CITY": "Gurugram",
+        "REGION": "North",
+        "revenue_net_inr": 99985.0,
+        "orders": 132,
+        "units": 382,
+        "aov_inr": 757.46,
+        "revenue_share_pct": 3.13,
+        "rank": 1
+      },
+      {
+        "STORE_ID": "ST034",
+        "STORE_NAME": "QuickBite Mumbai 34",
+        "CITY": "Mumbai",
+        "REGION": "West",
+        "revenue_net_inr": 94950.0,
+        "orders": 134,
+        "units": 395,
+        "aov_inr": 708.58,
+        "revenue_share_pct": 2.97,
+        "rank": 2
+      },
+      {
+        "STORE_ID": "ST022",
+        "STORE_NAME": "QuickBite Hyderabad 22",
+        "CITY": "Hyderabad",
+        "REGION": "South",
+        "revenue_net_inr": 86095.0,
+        "orders": 127,
+        "units": 380,
+        "aov_inr": 677.91,
+        "revenue_share_pct": 2.69,
+        "rank": 3
+      },
+      {
+        "STORE_ID": "ST028",
+        "STORE_NAME": "QuickBite Gurugram 28",
+        "CITY": "Gurugram",
+        "REGION": "North",
+        "revenue_net_inr": 86000.0,
+        "orders": 113,
+        "units": 319,
+        "aov_inr": 761.06,
+        "revenue_share_pct": 2.69,
+        "rank": 4
+      },
+      {
+        "STORE_ID": "ST041",
+        "STORE_NAME": "QuickBite Pune 41",
+        "CITY": "Pune",
+        "REGION": "West",
+        "revenue_net_inr": 84080.0,
+        "orders": 130,
+        "units": 362,
+        "aov_inr": 646.77,
+        "revenue_share_pct": 2.63,
+        "rank": 5
+      }
+    ],
+    "bottom_5": [
+      {
+        "STORE_ID": "ST019",
+        "STORE_NAME": "QuickBite Delhi 19",
+        "CITY": "Delhi",
+        "REGION": "North",
+        "revenue_net_inr": 37498.5,
+        "orders": 64,
+        "units": 172,
+        "aov_inr": 585.91,
+        "revenue_share_pct": 1.17,
+        "rank": 50
+      },
+      {
+        "STORE_ID": "ST040",
+        "STORE_NAME": "QuickBite Chennai 40",
+        "CITY": "Chennai",
+        "REGION": "South",
+        "revenue_net_inr": 39985.0,
+        "orders": 75,
+        "units": 187,
+        "aov_inr": 533.13,
+        "revenue_share_pct": 1.25,
+        "rank": 49
+      },
+      {
+        "STORE_ID": "ST037",
+        "STORE_NAME": "QuickBite Bengaluru 37",
+        "CITY": "Bengaluru",
+        "REGION": "South",
+        "revenue_net_inr": 43940.0,
+        "orders": 64,
+        "units": 181,
+        "aov_inr": 686.56,
+        "revenue_share_pct": 1.37,
+        "rank": 48
+      },
+      {
+        "STORE_ID": "ST007",
+        "STORE_NAME": "QuickBite Kolkata 07",
+        "CITY": "Kolkata",
+        "REGION": "East",
+        "revenue_net_inr": 44151.0,
+        "orders": 84,
+        "units": 227,
+        "aov_inr": 525.61,
+        "revenue_share_pct": 1.38,
+        "rank": 47
+      },
+      {
+        "STORE_ID": "ST033",
+        "STORE_NAME": "QuickBite Pune 33",
+        "CITY": "Pune",
+        "REGION": "West",
+        "revenue_net_inr": 45717.0,
+        "orders": 68,
+        "units": 193,
+        "aov_inr": 672.31,
+        "revenue_share_pct": 1.43,
+        "rank": 46
+      }
+    ],
+    "all_stores": [
+      {
+        "STORE_ID": "ST004",
+        "STORE_NAME": "QuickBite Gurugram 04",
+        "CITY": "Gurugram",
+        "REGION": "North",
+        "revenue_net_inr": 99985.0,
+        "orders": 132,
+        "units": 382,
+        "aov_inr": 757.46,
+        "revenue_share_pct": 3.13,
+        "rank": 1
+      },
+      {
+        "STORE_ID": "ST034",
+        "STORE_NAME": "QuickBite Mumbai 34",
+        "CITY": "Mumbai",
+        "REGION": "West",
+        "revenue_net_inr": 94950.0,
+        "orders": 134,
+        "units": 395,
+        "aov_inr": 708.58,
+        "revenue_share_pct": 2.97,
+        "rank": 2
+      },
+      {
+        "STORE_ID": "ST022",
+        "STORE_NAME": "QuickBite Hyderabad 22",
+        "CITY": "Hyderabad",
+        "REGION": "South",
+        "revenue_net_inr": 86095.0,
+        "orders": 127,
+        "units": 380,
+        "aov_inr": 677.91,
+        "revenue_share_pct": 2.69,
+        "rank": 3
+      },
+      {
+        "STORE_ID": "ST028",
+        "STORE_NAME": "QuickBite Gurugram 28",
+        "CITY": "Gurugram",
+        "REGION": "North",
+        "revenue_net_inr": 86000.0,
+        "orders": 113,
+        "units": 319,
+        "aov_inr": 761.06,
+        "revenue_share_pct": 2.69,
+        "rank": 4
+      },
+      {
+        "STORE_ID": "ST041",
+        "STORE_NAME": "QuickBite Pune 41",
+        "CITY": "Pune",
+        "REGION": "West",
+        "revenue_net_inr": 84080.0,
+        "orders": 130,
+        "units": 362,
+        "aov_inr": 646.77,
+        "revenue_share_pct": 2.63,
+        "rank": 5
+      },
+      {
+        "STORE_ID": "ST025",
+        "STORE_NAME": "QuickBite Pune 25",
+        "CITY": "Pune",
+        "REGION": "West",
+        "revenue_net_inr": 81760.0,
+        "orders": 125,
+        "units": 330,
+        "aov_inr": 654.08,
+        "revenue_share_pct": 2.56,
+        "rank": 6
+      },
+      {
+        "STORE_ID": "ST043",
+        "STORE_NAME": "QuickBite Delhi 43",
+        "CITY": "Delhi",
+        "REGION": "North",
+        "revenue_net_inr": 77795.0,
+        "orders": 109,
+        "units": 317,
+        "aov_inr": 713.72,
+        "revenue_share_pct": 2.43,
+        "rank": 7
+      },
+      {
+        "STORE_ID": "ST030",
+        "STORE_NAME": "QuickBite Hyderabad 30",
+        "CITY": "Hyderabad",
+        "REGION": "South",
+        "revenue_net_inr": 77090.0,
+        "orders": 121,
+        "units": 331,
+        "aov_inr": 637.11,
+        "revenue_share_pct": 2.41,
+        "rank": 8
+      },
+      {
+        "STORE_ID": "ST026",
+        "STORE_NAME": "QuickBite Mumbai 26",
+        "CITY": "Mumbai",
+        "REGION": "West",
+        "revenue_net_inr": 76455.0,
+        "orders": 107,
+        "units": 307,
+        "aov_inr": 714.53,
+        "revenue_share_pct": 2.39,
+        "rank": 9
+      },
+      {
+        "STORE_ID": "ST048",
+        "STORE_NAME": "QuickBite Chennai 48",
+        "CITY": "Chennai",
+        "REGION": "South",
+        "revenue_net_inr": 76320.0,
+        "orders": 123,
+        "units": 341,
+        "aov_inr": 620.49,
+        "revenue_share_pct": 2.39,
+        "rank": 10
+      },
+      {
+        "STORE_ID": "ST005",
+        "STORE_NAME": "QuickBite Bengaluru 05",
+        "CITY": "Bengaluru",
+        "REGION": "South",
+        "revenue_net_inr": 75855.0,
+        "orders": 114,
+        "units": 314,
+        "aov_inr": 665.39,
+        "revenue_share_pct": 2.37,
+        "rank": 11
+      },
+      {
+        "STORE_ID": "ST027",
+        "STORE_NAME": "QuickBite Delhi 27",
+        "CITY": "Delhi",
+        "REGION": "North",
+        "revenue_net_inr": 73825.0,
+        "orders": 112,
+        "units": 305,
+        "aov_inr": 659.15,
+        "revenue_share_pct": 2.31,
+        "rank": 12
+      },
+      {
+        "STORE_ID": "ST016",
+        "STORE_NAME": "QuickBite Chennai 16",
+        "CITY": "Chennai",
+        "REGION": "South",
+        "revenue_net_inr": 73605.0,
+        "orders": 120,
+        "units": 329,
+        "aov_inr": 613.38,
+        "revenue_share_pct": 2.3,
+        "rank": 13
+      },
+      {
+        "STORE_ID": "ST032",
+        "STORE_NAME": "QuickBite Chennai 32",
+        "CITY": "Chennai",
+        "REGION": "South",
+        "revenue_net_inr": 72845.0,
+        "orders": 110,
+        "units": 310,
+        "aov_inr": 662.23,
+        "revenue_share_pct": 2.28,
+        "rank": 14
+      },
+      {
+        "STORE_ID": "ST029",
+        "STORE_NAME": "QuickBite Bengaluru 29",
+        "CITY": "Bengaluru",
+        "REGION": "South",
+        "revenue_net_inr": 72610.0,
+        "orders": 105,
+        "units": 300,
+        "aov_inr": 691.52,
+        "revenue_share_pct": 2.27,
+        "rank": 15
+      },
+      {
+        "STORE_ID": "ST050",
+        "STORE_NAME": "QuickBite Mumbai 50",
+        "CITY": "Mumbai",
+        "REGION": "West",
+        "revenue_net_inr": 72055.0,
+        "orders": 109,
+        "units": 293,
+        "aov_inr": 661.06,
+        "revenue_share_pct": 2.25,
+        "rank": 16
+      },
+      {
+        "STORE_ID": "ST012",
+        "STORE_NAME": "QuickBite Gurugram 12",
+        "CITY": "Gurugram",
+        "REGION": "North",
+        "revenue_net_inr": 71305.0,
+        "orders": 106,
+        "units": 277,
+        "aov_inr": 672.69,
+        "revenue_share_pct": 2.23,
+        "rank": 17
+      },
+      {
+        "STORE_ID": "ST006",
+        "STORE_NAME": "QuickBite Hyderabad 06",
+        "CITY": "Hyderabad",
+        "REGION": "South",
+        "revenue_net_inr": 68055.0,
+        "orders": 101,
+        "units": 291,
+        "aov_inr": 673.81,
+        "revenue_share_pct": 2.13,
+        "rank": 18
+      },
+      {
+        "STORE_ID": "ST010",
+        "STORE_NAME": "QuickBite Mumbai 10",
+        "CITY": "Mumbai",
+        "REGION": "West",
+        "revenue_net_inr": 67235.0,
+        "orders": 106,
+        "units": 292,
+        "aov_inr": 634.29,
+        "revenue_share_pct": 2.1,
+        "rank": 19
+      },
+      {
+        "STORE_ID": "ST013",
+        "STORE_NAME": "QuickBite Bengaluru 13",
+        "CITY": "Bengaluru",
+        "REGION": "South",
+        "revenue_net_inr": 66055.0,
+        "orders": 99,
+        "units": 286,
+        "aov_inr": 667.22,
+        "revenue_share_pct": 2.07,
+        "rank": 20
+      },
+      {
+        "STORE_ID": "ST035",
+        "STORE_NAME": "QuickBite Delhi 35",
+        "CITY": "Delhi",
+        "REGION": "North",
+        "revenue_net_inr": 64940.0,
+        "orders": 98,
+        "units": 256,
+        "aov_inr": 662.65,
+        "revenue_share_pct": 2.03,
+        "rank": 21
+      },
+      {
+        "STORE_ID": "ST036",
+        "STORE_NAME": "QuickBite Gurugram 36",
+        "CITY": "Gurugram",
+        "REGION": "North",
+        "revenue_net_inr": 64545.0,
+        "orders": 95,
+        "units": 260,
+        "aov_inr": 679.42,
+        "revenue_share_pct": 2.02,
+        "rank": 22
+      },
+      {
+        "STORE_ID": "ST044",
+        "STORE_NAME": "QuickBite Gurugram 44",
+        "CITY": "Gurugram",
+        "REGION": "North",
+        "revenue_net_inr": 63195.0,
+        "orders": 94,
+        "units": 246,
+        "aov_inr": 672.29,
+        "revenue_share_pct": 1.98,
+        "rank": 23
+      },
+      {
+        "STORE_ID": "ST021",
+        "STORE_NAME": "QuickBite Bengaluru 21",
+        "CITY": "Bengaluru",
+        "REGION": "South",
+        "revenue_net_inr": 63085.0,
+        "orders": 89,
+        "units": 254,
+        "aov_inr": 708.82,
+        "revenue_share_pct": 1.97,
+        "rank": 24
+      },
+      {
+        "STORE_ID": "ST039",
+        "STORE_NAME": "QuickBite Kolkata 39",
+        "CITY": "Kolkata",
+        "REGION": "East",
+        "revenue_net_inr": 62440.0,
+        "orders": 106,
+        "units": 277,
+        "aov_inr": 589.06,
+        "revenue_share_pct": 1.95,
+        "rank": 25
+      },
+      {
+        "STORE_ID": "ST042",
+        "STORE_NAME": "QuickBite Mumbai 42",
+        "CITY": "Mumbai",
+        "REGION": "West",
+        "revenue_net_inr": 62345.0,
+        "orders": 91,
+        "units": 245,
+        "aov_inr": 685.11,
+        "revenue_share_pct": 1.95,
+        "rank": 26
+      },
+      {
+        "STORE_ID": "ST002",
+        "STORE_NAME": "QuickBite Mumbai 02",
+        "CITY": "Mumbai",
+        "REGION": "West",
+        "revenue_net_inr": 62325.0,
+        "orders": 85,
+        "units": 248,
+        "aov_inr": 733.24,
+        "revenue_share_pct": 1.95,
+        "rank": 27
+      },
+      {
+        "STORE_ID": "ST020",
+        "STORE_NAME": "QuickBite Gurugram 20",
+        "CITY": "Gurugram",
+        "REGION": "North",
+        "revenue_net_inr": 61505.0,
+        "orders": 86,
+        "units": 239,
+        "aov_inr": 715.17,
+        "revenue_share_pct": 1.92,
+        "rank": 28
+      },
+      {
+        "STORE_ID": "ST014",
+        "STORE_NAME": "QuickBite Hyderabad 14",
+        "CITY": "Hyderabad",
+        "REGION": "South",
+        "revenue_net_inr": 60090.0,
+        "orders": 105,
+        "units": 288,
+        "aov_inr": 572.29,
+        "revenue_share_pct": 1.88,
+        "rank": 29
+      },
+      {
+        "STORE_ID": "ST017",
+        "STORE_NAME": "QuickBite Pune 17",
+        "CITY": "Pune",
+        "REGION": "West",
+        "revenue_net_inr": 59770.0,
+        "orders": 102,
+        "units": 257,
+        "aov_inr": 585.98,
+        "revenue_share_pct": 1.87,
+        "rank": 30
+      },
+      {
+        "STORE_ID": "ST009",
+        "STORE_NAME": "QuickBite Pune 09",
+        "CITY": "Pune",
+        "REGION": "West",
+        "revenue_net_inr": 59190.0,
+        "orders": 96,
+        "units": 255,
+        "aov_inr": 616.56,
+        "revenue_share_pct": 1.85,
+        "rank": 31
+      },
+      {
+        "STORE_ID": "ST003",
+        "STORE_NAME": "QuickBite Delhi 03",
+        "CITY": "Delhi",
+        "REGION": "North",
+        "revenue_net_inr": 58385.0,
+        "orders": 83,
+        "units": 226,
+        "aov_inr": 703.43,
+        "revenue_share_pct": 1.83,
+        "rank": 32
+      },
+      {
+        "STORE_ID": "ST023",
+        "STORE_NAME": "QuickBite Kolkata 23",
+        "CITY": "Kolkata",
+        "REGION": "East",
+        "revenue_net_inr": 57530.0,
+        "orders": 97,
+        "units": 268,
+        "aov_inr": 593.09,
+        "revenue_share_pct": 1.8,
+        "rank": 33
+      },
+      {
+        "STORE_ID": "ST049",
+        "STORE_NAME": "QuickBite Pune 49",
+        "CITY": "Pune",
+        "REGION": "West",
+        "revenue_net_inr": 57185.0,
+        "orders": 93,
+        "units": 241,
+        "aov_inr": 614.89,
+        "revenue_share_pct": 1.79,
+        "rank": 34
+      },
+      {
+        "STORE_ID": "ST045",
+        "STORE_NAME": "QuickBite Bengaluru 45",
+        "CITY": "Bengaluru",
+        "REGION": "South",
+        "revenue_net_inr": 57005.0,
+        "orders": 90,
+        "units": 231,
+        "aov_inr": 633.39,
+        "revenue_share_pct": 1.78,
+        "rank": 35
+      },
+      {
+        "STORE_ID": "ST001",
+        "STORE_NAME": "QuickBite Pune 01",
+        "CITY": "Pune",
+        "REGION": "West",
+        "revenue_net_inr": 55505.0,
+        "orders": 91,
+        "units": 241,
+        "aov_inr": 609.95,
+        "revenue_share_pct": 1.74,
+        "rank": 36
+      },
+      {
+        "STORE_ID": "ST011",
+        "STORE_NAME": "QuickBite Delhi 11",
+        "CITY": "Delhi",
+        "REGION": "North",
+        "revenue_net_inr": 55285.0,
+        "orders": 89,
+        "units": 233,
+        "aov_inr": 621.18,
+        "revenue_share_pct": 1.73,
+        "rank": 37
+      },
+      {
+        "STORE_ID": "ST031",
+        "STORE_NAME": "QuickBite Kolkata 31",
+        "CITY": "Kolkata",
+        "REGION": "East",
+        "revenue_net_inr": 55080.0,
+        "orders": 96,
+        "units": 268,
+        "aov_inr": 573.75,
+        "revenue_share_pct": 1.72,
+        "rank": 38
+      },
+      {
+        "STORE_ID": "ST047",
+        "STORE_NAME": "QuickBite Kolkata 47",
+        "CITY": "Kolkata",
+        "REGION": "East",
+        "revenue_net_inr": 54900.0,
+        "orders": 85,
+        "units": 256,
+        "aov_inr": 645.88,
+        "revenue_share_pct": 1.72,
+        "rank": 39
+      },
+      {
+        "STORE_ID": "ST024",
+        "STORE_NAME": "QuickBite Chennai 24",
+        "CITY": "Chennai",
+        "REGION": "South",
+        "revenue_net_inr": 52235.0,
+        "orders": 93,
+        "units": 239,
+        "aov_inr": 561.67,
+        "revenue_share_pct": 1.63,
+        "rank": 40
+      },
+      {
+        "STORE_ID": "ST018",
+        "STORE_NAME": "QuickBite Mumbai 18",
+        "CITY": "Mumbai",
+        "REGION": "West",
+        "revenue_net_inr": 51510.0,
+        "orders": 80,
+        "units": 216,
+        "aov_inr": 643.88,
+        "revenue_share_pct": 1.61,
+        "rank": 41
+      },
+      {
+        "STORE_ID": "ST008",
+        "STORE_NAME": "QuickBite Chennai 08",
+        "CITY": "Chennai",
+        "REGION": "South",
+        "revenue_net_inr": 50595.0,
+        "orders": 89,
+        "units": 234,
+        "aov_inr": 568.48,
+        "revenue_share_pct": 1.58,
+        "rank": 42
+      },
+      {
+        "STORE_ID": "ST015",
+        "STORE_NAME": "QuickBite Kolkata 15",
+        "CITY": "Kolkata",
+        "REGION": "East",
+        "revenue_net_inr": 49610.0,
+        "orders": 78,
+        "units": 219,
+        "aov_inr": 636.03,
+        "revenue_share_pct": 1.55,
+        "rank": 43
+      },
+      {
+        "STORE_ID": "ST038",
+        "STORE_NAME": "QuickBite Hyderabad 38",
+        "CITY": "Hyderabad",
+        "REGION": "South",
+        "revenue_net_inr": 47270.0,
+        "orders": 82,
+        "units": 219,
+        "aov_inr": 576.46,
+        "revenue_share_pct": 1.48,
+        "rank": 44
+      },
+      {
+        "STORE_ID": "ST046",
+        "STORE_NAME": "QuickBite Hyderabad 46",
+        "CITY": "Hyderabad",
+        "REGION": "South",
+        "revenue_net_inr": 46285.0,
+        "orders": 79,
+        "units": 202,
+        "aov_inr": 585.89,
+        "revenue_share_pct": 1.45,
+        "rank": 45
+      },
+      {
+        "STORE_ID": "ST033",
+        "STORE_NAME": "QuickBite Pune 33",
+        "CITY": "Pune",
+        "REGION": "West",
+        "revenue_net_inr": 45717.0,
+        "orders": 68,
+        "units": 193,
+        "aov_inr": 672.31,
+        "revenue_share_pct": 1.43,
+        "rank": 46
+      },
+      {
+        "STORE_ID": "ST007",
+        "STORE_NAME": "QuickBite Kolkata 07",
+        "CITY": "Kolkata",
+        "REGION": "East",
+        "revenue_net_inr": 44151.0,
+        "orders": 84,
+        "units": 227,
+        "aov_inr": 525.61,
+        "revenue_share_pct": 1.38,
+        "rank": 47
+      },
+      {
+        "STORE_ID": "ST037",
+        "STORE_NAME": "QuickBite Bengaluru 37",
+        "CITY": "Bengaluru",
+        "REGION": "South",
+        "revenue_net_inr": 43940.0,
+        "orders": 64,
+        "units": 181,
+        "aov_inr": 686.56,
+        "revenue_share_pct": 1.37,
+        "rank": 48
+      },
+      {
+        "STORE_ID": "ST040",
+        "STORE_NAME": "QuickBite Chennai 40",
+        "CITY": "Chennai",
+        "REGION": "South",
+        "revenue_net_inr": 39985.0,
+        "orders": 75,
+        "units": 187,
+        "aov_inr": 533.13,
+        "revenue_share_pct": 1.25,
+        "rank": 49
+      },
+      {
+        "STORE_ID": "ST019",
+        "STORE_NAME": "QuickBite Delhi 19",
+        "CITY": "Delhi",
+        "REGION": "North",
+        "revenue_net_inr": 37498.5,
+        "orders": 64,
+        "units": 172,
+        "aov_inr": 585.91,
+        "revenue_share_pct": 1.17,
+        "rank": 50
+      }
+    ]
+  },
+  "q3": {
+    "question": "How do our sales channels compare in the last 3 months?",
+    "window": {
+      "start": "2026-05-01",
+      "end": "2026-07-31"
+    },
+    "grain": "order",
+    "total_revenue_inr": 3197076.5,
+    "total_orders": 4930,
+    "channels": [
+      {
+        "CHANNEL": "Zomato",
+        "revenue_net_inr": 907336.5,
+        "orders": 1383,
+        "units": 3758,
+        "aov_inr": 656.06,
+        "revenue_share_pct": 28.38,
+        "order_share_pct": 28.05,
+        "units_per_order": 2.72
+      },
+      {
+        "CHANNEL": "Dine-in",
+        "revenue_net_inr": 810965.5,
+        "orders": 1269,
+        "units": 3499,
+        "aov_inr": 639.06,
+        "revenue_share_pct": 25.37,
+        "order_share_pct": 25.74,
+        "units_per_order": 2.76
+      },
+      {
+        "CHANNEL": "Swiggy",
+        "revenue_net_inr": 801363.0,
+        "orders": 1189,
+        "units": 3334,
+        "aov_inr": 673.98,
+        "revenue_share_pct": 25.07,
+        "order_share_pct": 24.12,
+        "units_per_order": 2.8
+      },
+      {
+        "CHANNEL": "Takeaway",
+        "revenue_net_inr": 677411.5,
+        "orders": 1089,
+        "units": 2948,
+        "aov_inr": 622.05,
+        "revenue_share_pct": 21.19,
+        "order_share_pct": 22.09,
+        "units_per_order": 2.71
+      }
+    ]
+  },
+  "q4": {
+    "question": "Which products sell the most in the last 3 months?",
+    "window": {
+      "start": "2026-05-01",
+      "end": "2026-07-31"
+    },
+    "grain": "line",
+    "top_5_by_quantity": [
+      {
+        "SKU_ID": "SKU005",
+        "SKU_NAME": "Veg Burger 5",
+        "CATEGORY": "Burgers",
+        "quantity": 706,
+        "line_revenue_inr": 220457.31,
+        "orders": 611,
+        "est_cogs_inr": 86342.1,
+        "gross_margin_inr": 134115.21,
+        "margin_pct": 60.84
+      },
+      {
+        "SKU_ID": "SKU006",
+        "SKU_NAME": "Non-Veg Burger 6",
+        "CATEGORY": "Burgers",
+        "quantity": 669,
+        "line_revenue_inr": 147130.7,
+        "orders": 599,
+        "est_cogs_inr": 41326.6,
+        "gross_margin_inr": 105804.1,
+        "margin_pct": 71.91
+      },
+      {
+        "SKU_ID": "SKU004",
+        "SKU_NAME": "Non-Veg Burger 4",
+        "CATEGORY": "Burgers",
+        "quantity": 603,
+        "line_revenue_inr": 160856.11,
+        "orders": 533,
+        "est_cogs_inr": 61360.5,
+        "gross_margin_inr": 99495.61,
+        "margin_pct": 61.85
+      },
+      {
+        "SKU_ID": "SKU008",
+        "SKU_NAME": "Non-Veg Wrap 2",
+        "CATEGORY": "Wraps",
+        "quantity": 601,
+        "line_revenue_inr": 118106.19,
+        "orders": 519,
+        "est_cogs_inr": 48591.15,
+        "gross_margin_inr": 69515.04,
+        "margin_pct": 58.86
+      },
+      {
+        "SKU_ID": "SKU001",
+        "SKU_NAME": "Veg Burger 1",
+        "CATEGORY": "Burgers",
+        "quantity": 591,
+        "line_revenue_inr": 122901.21,
+        "orders": 508,
+        "est_cogs_inr": 46840.7,
+        "gross_margin_inr": 76060.51,
+        "margin_pct": 61.89
+      }
+    ],
+    "top_5_by_revenue": [
+      {
+        "SKU_ID": "SKU016",
+        "SKU_NAME": "Non-Veg Pizza 4",
+        "CATEGORY": "Pizza",
+        "quantity": 529,
+        "line_revenue_inr": 258564.12,
+        "orders": 464,
+        "est_cogs_inr": 90818.0,
+        "gross_margin_inr": 167746.12,
+        "margin_pct": 64.88
+      },
+      {
+        "SKU_ID": "SKU005",
+        "SKU_NAME": "Veg Burger 5",
+        "CATEGORY": "Burgers",
+        "quantity": 706,
+        "line_revenue_inr": 220457.31,
+        "orders": 611,
+        "est_cogs_inr": 86342.1,
+        "gross_margin_inr": 134115.21,
+        "margin_pct": 60.84
+      },
+      {
+        "SKU_ID": "SKU014",
+        "SKU_NAME": "Non-Veg Pizza 2",
+        "CATEGORY": "Pizza",
+        "quantity": 495,
+        "line_revenue_inr": 194396.34,
+        "orders": 425,
+        "est_cogs_inr": 80083.25,
+        "gross_margin_inr": 114313.09,
+        "margin_pct": 58.8
+      },
+      {
+        "SKU_ID": "SKU015",
+        "SKU_NAME": "Veg Pizza 3",
+        "CATEGORY": "Pizza",
+        "quantity": 468,
+        "line_revenue_inr": 162341.15,
+        "orders": 411,
+        "est_cogs_inr": 50480.4,
+        "gross_margin_inr": 111860.75,
+        "margin_pct": 68.9
+      },
+      {
+        "SKU_ID": "SKU004",
+        "SKU_NAME": "Non-Veg Burger 4",
+        "CATEGORY": "Burgers",
+        "quantity": 603,
+        "line_revenue_inr": 160856.11,
+        "orders": 533,
+        "est_cogs_inr": 61360.5,
+        "gross_margin_inr": 99495.61,
+        "margin_pct": 61.85
+      }
+    ],
+    "line_revenue_total_inr": 3211295.08,
+    "order_revenue_total_inr": 3197076.5,
+    "grain_variance_inr": 14218.58,
+    "grain_variance_pct": 0.44,
+    "note": "These figures are LINE GRAIN, computed from Order_Details, because SKU identity exists only on the line. Line revenue in this window totals 3,211,295.08 INR against the canonical order-grain figure of 3,197,076.50 INR, a difference of 14,218.58 INR (+0.4447%). The gap comes from orders in the source workbook whose line values do not sum to their header NET_BEFORE_TAX. IMPORTANT: every one of those orders falls inside this three-month window - the preceding nine months have none - so the variance is about 0.44% of revenue here against 0.11% across the full year. Use these numbers for product mix, ranking and margin; use the order grain (Q1) for any revenue total."
+  },
+  "q5": {
+    "question": "Are any cities showing declining revenue in the last 3 months?",
+    "window": {
+      "start": "2026-05-01",
+      "end": "2026-07-31"
+    },
+    "grain": "order",
+    "months": [
+      "2026-05",
+      "2026-06",
+      "2026-07"
+    ],
+    "city_count": 8,
+    "cities": [
+      {
+        "city": "Hyderabad",
+        "monthly_revenue_inr": {
+          "2026-05": 129210.0,
+          "2026-06": 131670.0,
+          "2026-07": 124005.0
+        },
+        "first_month": "2026-05",
+        "last_month": "2026-07",
+        "first_month_revenue_inr": 129210.0,
+        "last_month_revenue_inr": 124005.0,
+        "change_inr": -5205.0,
+        "change_pct": -4.03,
+        "strictly_declining": false,
+        "last_below_first": true
+      },
+      {
+        "city": "Kolkata",
+        "monthly_revenue_inr": {
+          "2026-05": 108150.5,
+          "2026-06": 108819.5,
+          "2026-07": 106741.0
+        },
+        "first_month": "2026-05",
+        "last_month": "2026-07",
+        "first_month_revenue_inr": 108150.5,
+        "last_month_revenue_inr": 106741.0,
+        "change_inr": -1409.5,
+        "change_pct": -1.3,
+        "strictly_declining": false,
+        "last_below_first": true
+      },
+      {
+        "city": "Mumbai",
+        "monthly_revenue_inr": {
+          "2026-05": 165435.0,
+          "2026-06": 155470.0,
+          "2026-07": 165970.0
+        },
+        "first_month": "2026-05",
+        "last_month": "2026-07",
+        "first_month_revenue_inr": 165435.0,
+        "last_month_revenue_inr": 165970.0,
+        "change_inr": 535.0,
+        "change_pct": 0.32,
+        "strictly_declining": false,
+        "last_below_first": false
+      },
+      {
+        "city": "Pune",
+        "monthly_revenue_inr": {
+          "2026-05": 140318.5,
+          "2026-06": 158437.0,
+          "2026-07": 144451.5
+        },
+        "first_month": "2026-05",
+        "last_month": "2026-07",
+        "first_month_revenue_inr": 140318.5,
+        "last_month_revenue_inr": 144451.5,
+        "change_inr": 4133.0,
+        "change_pct": 2.95,
+        "strictly_declining": false,
+        "last_below_first": false
+      },
+      {
+        "city": "Delhi",
+        "monthly_revenue_inr": {
+          "2026-05": 120794.5,
+          "2026-06": 119901.0,
+          "2026-07": 127033.0
+        },
+        "first_month": "2026-05",
+        "last_month": "2026-07",
+        "first_month_revenue_inr": 120794.5,
+        "last_month_revenue_inr": 127033.0,
+        "change_inr": 6238.5,
+        "change_pct": 5.16,
+        "strictly_declining": false,
+        "last_below_first": false
+      },
+      {
+        "city": "Chennai",
+        "monthly_revenue_inr": {
+          "2026-05": 121090.0,
+          "2026-06": 114260.0,
+          "2026-07": 130235.0
+        },
+        "first_month": "2026-05",
+        "last_month": "2026-07",
+        "first_month_revenue_inr": 121090.0,
+        "last_month_revenue_inr": 130235.0,
+        "change_inr": 9145.0,
+        "change_pct": 7.55,
+        "strictly_declining": false,
+        "last_below_first": false
+      },
+      {
+        "city": "Gurugram",
+        "monthly_revenue_inr": {
+          "2026-05": 146425.0,
+          "2026-06": 142210.0,
+          "2026-07": 157900.0
+        },
+        "first_month": "2026-05",
+        "last_month": "2026-07",
+        "first_month_revenue_inr": 146425.0,
+        "last_month_revenue_inr": 157900.0,
+        "change_inr": 11475.0,
+        "change_pct": 7.84,
+        "strictly_declining": false,
+        "last_below_first": false
+      },
+      {
+        "city": "Bengaluru",
+        "monthly_revenue_inr": {
+          "2026-05": 120810.0,
+          "2026-06": 110840.0,
+          "2026-07": 146900.0
+        },
+        "first_month": "2026-05",
+        "last_month": "2026-07",
+        "first_month_revenue_inr": 120810.0,
+        "last_month_revenue_inr": 146900.0,
+        "change_inr": 26090.0,
+        "change_pct": 21.6,
+        "strictly_declining": false,
+        "last_below_first": false
+      }
+    ],
+    "declining_cities": [],
+    "declining_city_count": 0,
+    "note": "'strictly_declining' means revenue fell in every consecutive month. 'last_below_first' is the weaker test of the endpoint alone."
+  },
+  "q6": {
+    "question": "How does weekend trading compare with weekday trading?",
+    "grain": "order",
+    "full_year": {
+      "window": {
+        "start": "2025-08-01",
+        "end": "2026-07-31"
+      },
+      "day_types": [
+        {
+          "DAY_TYPE": "Weekday",
+          "revenue_net_inr": 8791630.2,
+          "orders": 13448,
+          "units": 37029,
+          "distinct_days": 261,
+          "aov_inr": 653.75,
+          "avg_revenue_per_day_inr": 33684.41,
+          "avg_orders_per_day": 51.52,
+          "units_per_order": 2.75
+        },
+        {
+          "DAY_TYPE": "Weekend",
+          "revenue_net_inr": 4172207.5,
+          "orders": 6552,
+          "units": 17731,
+          "distinct_days": 104,
+          "aov_inr": 636.78,
+          "avg_revenue_per_day_inr": 40117.38,
+          "avg_orders_per_day": 63.0,
+          "units_per_order": 2.71
+        }
+      ],
+      "weekend_to_weekday_daily_revenue_ratio": 1.19,
+      "weekend_to_weekday_daily_orders_ratio": 1.22,
+      "weekend_to_weekday_aov_ratio": 0.97
+    },
+    "last_3_months": {
+      "window": {
+        "start": "2026-05-01",
+        "end": "2026-07-31"
+      },
+      "day_types": [
+        {
+          "DAY_TYPE": "Weekday",
+          "revenue_net_inr": 2210756.5,
+          "orders": 3376,
+          "units": 9346,
+          "distinct_days": 66,
+          "aov_inr": 654.84,
+          "avg_revenue_per_day_inr": 33496.31,
+          "avg_orders_per_day": 51.15,
+          "units_per_order": 2.77
+        },
+        {
+          "DAY_TYPE": "Weekend",
+          "revenue_net_inr": 986320.0,
+          "orders": 1554,
+          "units": 4193,
+          "distinct_days": 26,
+          "aov_inr": 634.7,
+          "avg_revenue_per_day_inr": 37935.38,
+          "avg_orders_per_day": 59.77,
+          "units_per_order": 2.7
+        }
+      ],
+      "weekend_to_weekday_daily_revenue_ratio": 1.13,
+      "weekend_to_weekday_daily_orders_ratio": 1.17,
+      "weekend_to_weekday_aov_ratio": 0.97
+    },
+    "note": "Compare avg_revenue_per_day_inr, never the raw totals. A year holds about 2.5x more weekdays than weekend days, so weekday revenue is larger in total even though each weekend day trades far harder."
+  },
+  "q7": {
+    "question": "How much do festive periods lift trading versus normal days?",
+    "window": {
+      "start": "2025-08-01",
+      "end": "2026-07-31"
+    },
+    "grain": "order",
+    "normal": {
+      "period": "Normal",
+      "revenue_net_inr": 11669814.5,
+      "orders": 17993,
+      "units": 49278,
+      "aov_inr": 648.58,
+      "distinct_days": 336,
+      "avg_revenue_per_day_inr": 34731.59,
+      "avg_orders_per_day": 53.55,
+      "units_per_order": 2.74
+    },
+    "festive_periods": [
+      {
+        "period": "Pujo",
+        "revenue_net_inr": 521290.0,
+        "orders": 802,
+        "units": 2212,
+        "aov_inr": 649.99,
+        "distinct_days": 11,
+        "avg_revenue_per_day_inr": 47390.0,
+        "avg_orders_per_day": 72.91,
+        "units_per_order": 2.76,
+        "revenue_uplift_vs_normal_x": 1.36,
+        "orders_uplift_vs_normal_x": 1.36,
+        "aov_uplift_vs_normal_x": 1.0
+      },
+      {
+        "period": "Diwali",
+        "revenue_net_inr": 484110.0,
+        "orders": 761,
+        "units": 2046,
+        "aov_inr": 636.15,
+        "distinct_days": 11,
+        "avg_revenue_per_day_inr": 44010.0,
+        "avg_orders_per_day": 69.18,
+        "units_per_order": 2.69,
+        "revenue_uplift_vs_normal_x": 1.27,
+        "orders_uplift_vs_normal_x": 1.29,
+        "aov_uplift_vs_normal_x": 0.98
+      },
+      {
+        "period": "New Year",
+        "revenue_net_inr": 288623.2,
+        "orders": 444,
+        "units": 1224,
+        "aov_inr": 650.05,
+        "distinct_days": 7,
+        "avg_revenue_per_day_inr": 41231.89,
+        "avg_orders_per_day": 63.43,
+        "units_per_order": 2.76,
+        "revenue_uplift_vs_normal_x": 1.19,
+        "orders_uplift_vs_normal_x": 1.18,
+        "aov_uplift_vs_normal_x": 1.0
+      }
+    ],
+    "all_festive_combined": {
+      "period": "All festive",
+      "revenue_net_inr": 1294023.2,
+      "orders": 2007,
+      "units": 5482,
+      "aov_inr": 644.75,
+      "distinct_days": 29,
+      "avg_revenue_per_day_inr": 44621.49,
+      "avg_orders_per_day": 69.21,
+      "units_per_order": 2.73,
+      "revenue_uplift_vs_normal_x": 1.28,
+      "orders_uplift_vs_normal_x": 1.29,
+      "aov_uplift_vs_normal_x": 0.99
+    },
+    "note": "Uplift is measured per trading day, because the festive periods cover far fewer days than Normal. Raw totals would understate the effect."
+  },
+  "q8": {
+    "question": "Which stores have consistently declining revenue, and why are they declining?",
+    "window": {
+      "start": "2026-05-01",
+      "end": "2026-07-31"
+    },
+    "prior_window": {
+      "start": "2026-02-01",
+      "end": "2026-04-30"
+    },
+    "grain": "order",
+    "months": [
+      "2026-05",
+      "2026-06",
+      "2026-07"
+    ],
+    "store_count": 50,
+    "declining_store_count": 9,
+    "stores": [
+      {
+        "store_id": "ST039",
+        "store_name": "QuickBite Kolkata 39",
+        "city": "Kolkata",
+        "region": "East",
+        "monthly_revenue_inr": {
+          "2026-05": 25150.0,
+          "2026-06": 22545.0,
+          "2026-07": 14745.0
+        },
+        "window_revenue_inr": 62440.0,
+        "change_inr": -10405.0,
+        "change_pct": -41.37,
+        "declined_every_month": true
+      },
+      {
+        "store_id": "ST046",
+        "store_name": "QuickBite Hyderabad 46",
+        "city": "Hyderabad",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 17370.0,
+          "2026-06": 18135.0,
+          "2026-07": 10780.0
+        },
+        "window_revenue_inr": 46285.0,
+        "change_inr": -6590.0,
+        "change_pct": -37.94,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST014",
+        "store_name": "QuickBite Hyderabad 14",
+        "city": "Hyderabad",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 20690.0,
+          "2026-06": 26370.0,
+          "2026-07": 13030.0
+        },
+        "window_revenue_inr": 60090.0,
+        "change_inr": -7660.0,
+        "change_pct": -37.02,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST042",
+        "store_name": "QuickBite Mumbai 42",
+        "city": "Mumbai",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 25435.0,
+          "2026-06": 20045.0,
+          "2026-07": 16865.0
+        },
+        "window_revenue_inr": 62345.0,
+        "change_inr": -8570.0,
+        "change_pct": -33.69,
+        "declined_every_month": true
+      },
+      {
+        "store_id": "ST040",
+        "store_name": "QuickBite Chennai 40",
+        "city": "Chennai",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 18575.0,
+          "2026-06": 8715.0,
+          "2026-07": 12695.0
+        },
+        "window_revenue_inr": 39985.0,
+        "change_inr": -5880.0,
+        "change_pct": -31.66,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST030",
+        "store_name": "QuickBite Hyderabad 30",
+        "city": "Hyderabad",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 29620.0,
+          "2026-06": 27100.0,
+          "2026-07": 20370.0
+        },
+        "window_revenue_inr": 77090.0,
+        "change_inr": -9250.0,
+        "change_pct": -31.23,
+        "declined_every_month": true
+      },
+      {
+        "store_id": "ST015",
+        "store_name": "QuickBite Kolkata 15",
+        "city": "Kolkata",
+        "region": "East",
+        "monthly_revenue_inr": {
+          "2026-05": 18830.0,
+          "2026-06": 16135.0,
+          "2026-07": 14645.0
+        },
+        "window_revenue_inr": 49610.0,
+        "change_inr": -4185.0,
+        "change_pct": -22.23,
+        "declined_every_month": true
+      },
+      {
+        "store_id": "ST011",
+        "store_name": "QuickBite Delhi 11",
+        "city": "Delhi",
+        "region": "North",
+        "monthly_revenue_inr": {
+          "2026-05": 21105.0,
+          "2026-06": 17755.0,
+          "2026-07": 16425.0
+        },
+        "window_revenue_inr": 55285.0,
+        "change_inr": -4680.0,
+        "change_pct": -22.17,
+        "declined_every_month": true
+      },
+      {
+        "store_id": "ST010",
+        "store_name": "QuickBite Mumbai 10",
+        "city": "Mumbai",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 25045.0,
+          "2026-06": 22375.0,
+          "2026-07": 19815.0
+        },
+        "window_revenue_inr": 67235.0,
+        "change_inr": -5230.0,
+        "change_pct": -20.88,
+        "declined_every_month": true
+      },
+      {
+        "store_id": "ST017",
+        "store_name": "QuickBite Pune 17",
+        "city": "Pune",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 18845.0,
+          "2026-06": 25555.0,
+          "2026-07": 15370.0
+        },
+        "window_revenue_inr": 59770.0,
+        "change_inr": -3475.0,
+        "change_pct": -18.44,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST041",
+        "store_name": "QuickBite Pune 41",
+        "city": "Pune",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 29015.0,
+          "2026-06": 30475.0,
+          "2026-07": 24590.0
+        },
+        "window_revenue_inr": 84080.0,
+        "change_inr": -4425.0,
+        "change_pct": -15.25,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST016",
+        "store_name": "QuickBite Chennai 16",
+        "city": "Chennai",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 26355.0,
+          "2026-06": 24645.0,
+          "2026-07": 22605.0
+        },
+        "window_revenue_inr": 73605.0,
+        "change_inr": -3750.0,
+        "change_pct": -14.23,
+        "declined_every_month": true
+      },
+      {
+        "store_id": "ST028",
+        "store_name": "QuickBite Gurugram 28",
+        "city": "Gurugram",
+        "region": "North",
+        "monthly_revenue_inr": {
+          "2026-05": 33345.0,
+          "2026-06": 23690.0,
+          "2026-07": 28965.0
+        },
+        "window_revenue_inr": 86000.0,
+        "change_inr": -4380.0,
+        "change_pct": -13.14,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST007",
+        "store_name": "QuickBite Kolkata 07",
+        "city": "Kolkata",
+        "region": "East",
+        "monthly_revenue_inr": {
+          "2026-05": 15460.5,
+          "2026-06": 15154.5,
+          "2026-07": 13536.0
+        },
+        "window_revenue_inr": 44151.0,
+        "change_inr": -1924.5,
+        "change_pct": -12.45,
+        "declined_every_month": true
+      },
+      {
+        "store_id": "ST037",
+        "store_name": "QuickBite Bengaluru 37",
+        "city": "Bengaluru",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 15985.0,
+          "2026-06": 13875.0,
+          "2026-07": 14080.0
+        },
+        "window_revenue_inr": 43940.0,
+        "change_inr": -1905.0,
+        "change_pct": -11.92,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST008",
+        "store_name": "QuickBite Chennai 08",
+        "city": "Chennai",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 16755.0,
+          "2026-06": 19010.0,
+          "2026-07": 14830.0
+        },
+        "window_revenue_inr": 50595.0,
+        "change_inr": -1925.0,
+        "change_pct": -11.49,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST043",
+        "store_name": "QuickBite Delhi 43",
+        "city": "Delhi",
+        "region": "North",
+        "monthly_revenue_inr": {
+          "2026-05": 28890.0,
+          "2026-06": 23210.0,
+          "2026-07": 25695.0
+        },
+        "window_revenue_inr": 77795.0,
+        "change_inr": -3195.0,
+        "change_pct": -11.06,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST001",
+        "store_name": "QuickBite Pune 01",
+        "city": "Pune",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 20130.0,
+          "2026-06": 17470.0,
+          "2026-07": 17905.0
+        },
+        "window_revenue_inr": 55505.0,
+        "change_inr": -2225.0,
+        "change_pct": -11.05,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST005",
+        "store_name": "QuickBite Bengaluru 05",
+        "city": "Bengaluru",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 29725.0,
+          "2026-06": 19670.0,
+          "2026-07": 26460.0
+        },
+        "window_revenue_inr": 75855.0,
+        "change_inr": -3265.0,
+        "change_pct": -10.98,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST022",
+        "store_name": "QuickBite Hyderabad 22",
+        "city": "Hyderabad",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 31475.0,
+          "2026-06": 25505.0,
+          "2026-07": 29115.0
+        },
+        "window_revenue_inr": 86095.0,
+        "change_inr": -2360.0,
+        "change_pct": -7.5,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST027",
+        "store_name": "QuickBite Delhi 27",
+        "city": "Delhi",
+        "region": "North",
+        "monthly_revenue_inr": {
+          "2026-05": 24150.0,
+          "2026-06": 27270.0,
+          "2026-07": 22405.0
+        },
+        "window_revenue_inr": 73825.0,
+        "change_inr": -1745.0,
+        "change_pct": -7.23,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST036",
+        "store_name": "QuickBite Gurugram 36",
+        "city": "Gurugram",
+        "region": "North",
+        "monthly_revenue_inr": {
+          "2026-05": 21790.0,
+          "2026-06": 22470.0,
+          "2026-07": 20285.0
+        },
+        "window_revenue_inr": 64545.0,
+        "change_inr": -1505.0,
+        "change_pct": -6.91,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST020",
+        "store_name": "QuickBite Gurugram 20",
+        "city": "Gurugram",
+        "region": "North",
+        "monthly_revenue_inr": {
+          "2026-05": 18070.0,
+          "2026-06": 26435.0,
+          "2026-07": 17000.0
+        },
+        "window_revenue_inr": 61505.0,
+        "change_inr": -1070.0,
+        "change_pct": -5.92,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST002",
+        "store_name": "QuickBite Mumbai 02",
+        "city": "Mumbai",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 21215.0,
+          "2026-06": 20760.0,
+          "2026-07": 20350.0
+        },
+        "window_revenue_inr": 62325.0,
+        "change_inr": -865.0,
+        "change_pct": -4.08,
+        "declined_every_month": true
+      },
+      {
+        "store_id": "ST031",
+        "store_name": "QuickBite Kolkata 31",
+        "city": "Kolkata",
+        "region": "East",
+        "monthly_revenue_inr": {
+          "2026-05": 20325.0,
+          "2026-06": 14785.0,
+          "2026-07": 19970.0
+        },
+        "window_revenue_inr": 55080.0,
+        "change_inr": -355.0,
+        "change_pct": -1.75,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST025",
+        "store_name": "QuickBite Pune 25",
+        "city": "Pune",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 26335.0,
+          "2026-06": 29185.0,
+          "2026-07": 26240.0
+        },
+        "window_revenue_inr": 81760.0,
+        "change_inr": -95.0,
+        "change_pct": -0.36,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST035",
+        "store_name": "QuickBite Delhi 35",
+        "city": "Delhi",
+        "region": "North",
+        "monthly_revenue_inr": {
+          "2026-05": 22975.0,
+          "2026-06": 19055.0,
+          "2026-07": 22910.0
+        },
+        "window_revenue_inr": 64940.0,
+        "change_inr": -65.0,
+        "change_pct": -0.28,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST026",
+        "store_name": "QuickBite Mumbai 26",
+        "city": "Mumbai",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 23675.0,
+          "2026-06": 28195.0,
+          "2026-07": 24585.0
+        },
+        "window_revenue_inr": 76455.0,
+        "change_inr": 910.0,
+        "change_pct": 3.84,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST024",
+        "store_name": "QuickBite Chennai 24",
+        "city": "Chennai",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 17620.0,
+          "2026-06": 16030.0,
+          "2026-07": 18585.0
+        },
+        "window_revenue_inr": 52235.0,
+        "change_inr": 965.0,
+        "change_pct": 5.48,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST034",
+        "store_name": "QuickBite Mumbai 34",
+        "city": "Mumbai",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 34800.0,
+          "2026-06": 22640.0,
+          "2026-07": 37510.0
+        },
+        "window_revenue_inr": 94950.0,
+        "change_inr": 2710.0,
+        "change_pct": 7.79,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST012",
+        "store_name": "QuickBite Gurugram 12",
+        "city": "Gurugram",
+        "region": "North",
+        "monthly_revenue_inr": {
+          "2026-05": 23775.0,
+          "2026-06": 21645.0,
+          "2026-07": 25885.0
+        },
+        "window_revenue_inr": 71305.0,
+        "change_inr": 2110.0,
+        "change_pct": 8.87,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST018",
+        "store_name": "QuickBite Mumbai 18",
+        "city": "Mumbai",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 16265.0,
+          "2026-06": 17195.0,
+          "2026-07": 18050.0
+        },
+        "window_revenue_inr": 51510.0,
+        "change_inr": 1785.0,
+        "change_pct": 10.97,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST044",
+        "store_name": "QuickBite Gurugram 44",
+        "city": "Gurugram",
+        "region": "North",
+        "monthly_revenue_inr": {
+          "2026-05": 21045.0,
+          "2026-06": 18290.0,
+          "2026-07": 23860.0
+        },
+        "window_revenue_inr": 63195.0,
+        "change_inr": 2815.0,
+        "change_pct": 13.38,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST013",
+        "store_name": "QuickBite Bengaluru 13",
+        "city": "Bengaluru",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 24120.0,
+          "2026-06": 13640.0,
+          "2026-07": 28295.0
+        },
+        "window_revenue_inr": 66055.0,
+        "change_inr": 4175.0,
+        "change_pct": 17.31,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST049",
+        "store_name": "QuickBite Pune 49",
+        "city": "Pune",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 18205.0,
+          "2026-06": 15550.0,
+          "2026-07": 23430.0
+        },
+        "window_revenue_inr": 57185.0,
+        "change_inr": 5225.0,
+        "change_pct": 28.7,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST009",
+        "store_name": "QuickBite Pune 09",
+        "city": "Pune",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 16885.0,
+          "2026-06": 20345.0,
+          "2026-07": 21960.0
+        },
+        "window_revenue_inr": 59190.0,
+        "change_inr": 5075.0,
+        "change_pct": 30.06,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST032",
+        "store_name": "QuickBite Chennai 32",
+        "city": "Chennai",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 21250.0,
+          "2026-06": 23010.0,
+          "2026-07": 28585.0
+        },
+        "window_revenue_inr": 72845.0,
+        "change_inr": 7335.0,
+        "change_pct": 34.52,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST045",
+        "store_name": "QuickBite Bengaluru 45",
+        "city": "Bengaluru",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 16770.0,
+          "2026-06": 17330.0,
+          "2026-07": 22905.0
+        },
+        "window_revenue_inr": 57005.0,
+        "change_inr": 6135.0,
+        "change_pct": 36.58,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST033",
+        "store_name": "QuickBite Pune 33",
+        "city": "Pune",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 10903.5,
+          "2026-06": 19857.0,
+          "2026-07": 14956.5
+        },
+        "window_revenue_inr": 45717.0,
+        "change_inr": 4053.0,
+        "change_pct": 37.17,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST004",
+        "store_name": "QuickBite Gurugram 04",
+        "city": "Gurugram",
+        "region": "North",
+        "monthly_revenue_inr": {
+          "2026-05": 28400.0,
+          "2026-06": 29680.0,
+          "2026-07": 41905.0
+        },
+        "window_revenue_inr": 99985.0,
+        "change_inr": 13505.0,
+        "change_pct": 47.55,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST029",
+        "store_name": "QuickBite Bengaluru 29",
+        "city": "Bengaluru",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 18905.0,
+          "2026-06": 25550.0,
+          "2026-07": 28155.0
+        },
+        "window_revenue_inr": 72610.0,
+        "change_inr": 9250.0,
+        "change_pct": 48.93,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST003",
+        "store_name": "QuickBite Delhi 03",
+        "city": "Delhi",
+        "region": "North",
+        "monthly_revenue_inr": {
+          "2026-05": 15345.0,
+          "2026-06": 20065.0,
+          "2026-07": 22975.0
+        },
+        "window_revenue_inr": 58385.0,
+        "change_inr": 7630.0,
+        "change_pct": 49.72,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST050",
+        "store_name": "QuickBite Mumbai 50",
+        "city": "Mumbai",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 19000.0,
+          "2026-06": 24260.0,
+          "2026-07": 28795.0
+        },
+        "window_revenue_inr": 72055.0,
+        "change_inr": 9795.0,
+        "change_pct": 51.55,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST023",
+        "store_name": "QuickBite Kolkata 23",
+        "city": "Kolkata",
+        "region": "East",
+        "monthly_revenue_inr": {
+          "2026-05": 15030.0,
+          "2026-06": 19470.0,
+          "2026-07": 23030.0
+        },
+        "window_revenue_inr": 57530.0,
+        "change_inr": 8000.0,
+        "change_pct": 53.23,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST047",
+        "store_name": "QuickBite Kolkata 47",
+        "city": "Kolkata",
+        "region": "East",
+        "monthly_revenue_inr": {
+          "2026-05": 13355.0,
+          "2026-06": 20730.0,
+          "2026-07": 20815.0
+        },
+        "window_revenue_inr": 54900.0,
+        "change_inr": 7460.0,
+        "change_pct": 55.86,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST048",
+        "store_name": "QuickBite Chennai 48",
+        "city": "Chennai",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 20535.0,
+          "2026-06": 22850.0,
+          "2026-07": 32935.0
+        },
+        "window_revenue_inr": 76320.0,
+        "change_inr": 12400.0,
+        "change_pct": 60.38,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST038",
+        "store_name": "QuickBite Hyderabad 38",
+        "city": "Hyderabad",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 12515.0,
+          "2026-06": 13850.0,
+          "2026-07": 20905.0
+        },
+        "window_revenue_inr": 47270.0,
+        "change_inr": 8390.0,
+        "change_pct": 67.04,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST006",
+        "store_name": "QuickBite Hyderabad 06",
+        "city": "Hyderabad",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 17540.0,
+          "2026-06": 20710.0,
+          "2026-07": 29805.0
+        },
+        "window_revenue_inr": 68055.0,
+        "change_inr": 12265.0,
+        "change_pct": 69.93,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST021",
+        "store_name": "QuickBite Bengaluru 21",
+        "city": "Bengaluru",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 15305.0,
+          "2026-06": 20775.0,
+          "2026-07": 27005.0
+        },
+        "window_revenue_inr": 63085.0,
+        "change_inr": 11700.0,
+        "change_pct": 76.45,
+        "declined_every_month": false
+      },
+      {
+        "store_id": "ST019",
+        "store_name": "QuickBite Delhi 19",
+        "city": "Delhi",
+        "region": "North",
+        "monthly_revenue_inr": {
+          "2026-05": 8329.5,
+          "2026-06": 12546.0,
+          "2026-07": 16623.0
+        },
+        "window_revenue_inr": 37498.5,
+        "change_inr": 8293.5,
+        "change_pct": 99.57,
+        "declined_every_month": false
+      }
+    ],
+    "declining_stores": [
+      {
+        "store_id": "ST039",
+        "store_name": "QuickBite Kolkata 39",
+        "city": "Kolkata",
+        "region": "East",
+        "monthly_revenue_inr": {
+          "2026-05": 25150.0,
+          "2026-06": 22545.0,
+          "2026-07": 14745.0
+        },
+        "window_revenue_inr": 62440.0,
+        "change_inr": -10405.0,
+        "change_pct": -41.37,
+        "declined_every_month": true,
+        "diagnostics": {
+          "monthly": [
+            {
+              "MONTH_KEY": "2026-05",
+              "revenue_net_inr": 25150.0,
+              "orders": 38,
+              "units": 115,
+              "aov_inr": 661.84,
+              "units_per_order": 3.03,
+              "distinct_identified_customers": 28
+            },
+            {
+              "MONTH_KEY": "2026-06",
+              "revenue_net_inr": 22545.0,
+              "orders": 39,
+              "units": 95,
+              "aov_inr": 578.08,
+              "units_per_order": 2.44,
+              "distinct_identified_customers": 27
+            },
+            {
+              "MONTH_KEY": "2026-07",
+              "revenue_net_inr": 14745.0,
+              "orders": 29,
+              "units": 67,
+              "aov_inr": 508.45,
+              "units_per_order": 2.31,
+              "distinct_identified_customers": 19
+            }
+          ],
+          "orders_change_pct": -23.68,
+          "aov_change_pct": -23.18,
+          "units_per_order_change_pct": -23.66,
+          "identified_customers_change_pct": -32.14,
+          "decomposition": {
+            "revenue_change_inr": -10405.0,
+            "attributable_to_order_volume_inr": -5956.58,
+            "attributable_to_basket_size_inr": -5828.97,
+            "primary_driver": "order volume"
+          },
+          "by_channel": [
+            {
+              "channel": "Zomato",
+              "monthly_revenue_inr": {
+                "2026-05": 8815.0,
+                "2026-06": 6045.0,
+                "2026-07": 3055.0
+              },
+              "change_inr": -5760.0,
+              "change_pct": -65.34,
+              "strictly_declining": true
+            },
+            {
+              "channel": "Swiggy",
+              "monthly_revenue_inr": {
+                "2026-05": 7285.0,
+                "2026-06": 3425.0,
+                "2026-07": 2585.0
+              },
+              "change_inr": -4700.0,
+              "change_pct": -64.52,
+              "strictly_declining": true
+            },
+            {
+              "channel": "Takeaway",
+              "monthly_revenue_inr": {
+                "2026-05": 6860.0,
+                "2026-06": 5205.0,
+                "2026-07": 5620.0
+              },
+              "change_inr": -1240.0,
+              "change_pct": -18.08,
+              "strictly_declining": false
+            },
+            {
+              "channel": "Dine-in",
+              "monthly_revenue_inr": {
+                "2026-05": 2190.0,
+                "2026-06": 7870.0,
+                "2026-07": 3485.0
+              },
+              "change_inr": 1295.0,
+              "change_pct": 59.13,
+              "strictly_declining": false
+            }
+          ],
+          "worst_channel": "Zomato",
+          "decline_concentrated_in_one_channel": true,
+          "prior_window": {
+            "start": "2026-02-01",
+            "end": "2026-04-30",
+            "revenue_net_inr": 48634.0
+          },
+          "current_window_revenue_inr": 62440.0,
+          "vs_prior_window_change_inr": 13806.0,
+          "vs_prior_window_change_pct": 28.39,
+          "is_break_in_trend": false,
+          "city": "Kolkata",
+          "city_trend": {
+            "change_pct": -1.3,
+            "strictly_declining": false,
+            "monthly_revenue_inr": {
+              "2026-05": 108150.5,
+              "2026-06": 108819.5,
+              "2026-07": 106741.0
+            }
+          },
+          "store_specific_vs_market_wide": "store-specific"
+        }
+      },
+      {
+        "store_id": "ST042",
+        "store_name": "QuickBite Mumbai 42",
+        "city": "Mumbai",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 25435.0,
+          "2026-06": 20045.0,
+          "2026-07": 16865.0
+        },
+        "window_revenue_inr": 62345.0,
+        "change_inr": -8570.0,
+        "change_pct": -33.69,
+        "declined_every_month": true,
+        "diagnostics": {
+          "monthly": [
+            {
+              "MONTH_KEY": "2026-05",
+              "revenue_net_inr": 25435.0,
+              "orders": 37,
+              "units": 99,
+              "aov_inr": 687.43,
+              "units_per_order": 2.68,
+              "distinct_identified_customers": 27
+            },
+            {
+              "MONTH_KEY": "2026-06",
+              "revenue_net_inr": 20045.0,
+              "orders": 27,
+              "units": 77,
+              "aov_inr": 742.41,
+              "units_per_order": 2.85,
+              "distinct_identified_customers": 21
+            },
+            {
+              "MONTH_KEY": "2026-07",
+              "revenue_net_inr": 16865.0,
+              "orders": 27,
+              "units": 69,
+              "aov_inr": 624.63,
+              "units_per_order": 2.56,
+              "distinct_identified_customers": 21
+            }
+          ],
+          "orders_change_pct": -27.03,
+          "aov_change_pct": -9.14,
+          "units_per_order_change_pct": -4.49,
+          "identified_customers_change_pct": -22.22,
+          "decomposition": {
+            "revenue_change_inr": -8570.0,
+            "attributable_to_order_volume_inr": -6874.32,
+            "attributable_to_basket_size_inr": -2323.7,
+            "primary_driver": "order volume"
+          },
+          "by_channel": [
+            {
+              "channel": "Zomato",
+              "monthly_revenue_inr": {
+                "2026-05": 8590.0,
+                "2026-06": 7355.0,
+                "2026-07": 2485.0
+              },
+              "change_inr": -6105.0,
+              "change_pct": -71.07,
+              "strictly_declining": true
+            },
+            {
+              "channel": "Swiggy",
+              "monthly_revenue_inr": {
+                "2026-05": 7660.0,
+                "2026-06": 5465.0,
+                "2026-07": 4555.0
+              },
+              "change_inr": -3105.0,
+              "change_pct": -40.54,
+              "strictly_declining": true
+            },
+            {
+              "channel": "Takeaway",
+              "monthly_revenue_inr": {
+                "2026-05": 3540.0,
+                "2026-06": 3700.0,
+                "2026-07": 1950.0
+              },
+              "change_inr": -1590.0,
+              "change_pct": -44.92,
+              "strictly_declining": false
+            },
+            {
+              "channel": "Dine-in",
+              "monthly_revenue_inr": {
+                "2026-05": 5645.0,
+                "2026-06": 3525.0,
+                "2026-07": 7875.0
+              },
+              "change_inr": 2230.0,
+              "change_pct": 39.5,
+              "strictly_declining": false
+            }
+          ],
+          "worst_channel": "Zomato",
+          "decline_concentrated_in_one_channel": true,
+          "prior_window": {
+            "start": "2026-02-01",
+            "end": "2026-04-30",
+            "revenue_net_inr": 65468.0
+          },
+          "current_window_revenue_inr": 62345.0,
+          "vs_prior_window_change_inr": -3123.0,
+          "vs_prior_window_change_pct": -4.77,
+          "is_break_in_trend": true,
+          "city": "Mumbai",
+          "city_trend": {
+            "change_pct": 0.32,
+            "strictly_declining": false,
+            "monthly_revenue_inr": {
+              "2026-05": 165435.0,
+              "2026-06": 155470.0,
+              "2026-07": 165970.0
+            }
+          },
+          "store_specific_vs_market_wide": "store-specific"
+        }
+      },
+      {
+        "store_id": "ST030",
+        "store_name": "QuickBite Hyderabad 30",
+        "city": "Hyderabad",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 29620.0,
+          "2026-06": 27100.0,
+          "2026-07": 20370.0
+        },
+        "window_revenue_inr": 77090.0,
+        "change_inr": -9250.0,
+        "change_pct": -31.23,
+        "declined_every_month": true,
+        "diagnostics": {
+          "monthly": [
+            {
+              "MONTH_KEY": "2026-05",
+              "revenue_net_inr": 29620.0,
+              "orders": 43,
+              "units": 123,
+              "aov_inr": 688.84,
+              "units_per_order": 2.86,
+              "distinct_identified_customers": 33
+            },
+            {
+              "MONTH_KEY": "2026-06",
+              "revenue_net_inr": 27100.0,
+              "orders": 46,
+              "units": 119,
+              "aov_inr": 589.13,
+              "units_per_order": 2.59,
+              "distinct_identified_customers": 36
+            },
+            {
+              "MONTH_KEY": "2026-07",
+              "revenue_net_inr": 20370.0,
+              "orders": 32,
+              "units": 89,
+              "aov_inr": 636.56,
+              "units_per_order": 2.78,
+              "distinct_identified_customers": 23
+            }
+          ],
+          "orders_change_pct": -25.58,
+          "aov_change_pct": -7.59,
+          "units_per_order_change_pct": -2.77,
+          "identified_customers_change_pct": -30.3,
+          "decomposition": {
+            "revenue_change_inr": -9250.0,
+            "attributable_to_order_volume_inr": -7577.21,
+            "attributable_to_basket_size_inr": -2247.81,
+            "primary_driver": "order volume"
+          },
+          "by_channel": [
+            {
+              "channel": "Dine-in",
+              "monthly_revenue_inr": {
+                "2026-05": 9165.0,
+                "2026-06": 3465.0,
+                "2026-07": 3520.0
+              },
+              "change_inr": -5645.0,
+              "change_pct": -61.59,
+              "strictly_declining": false
+            },
+            {
+              "channel": "Takeaway",
+              "monthly_revenue_inr": {
+                "2026-05": 9135.0,
+                "2026-06": 5890.0,
+                "2026-07": 4675.0
+              },
+              "change_inr": -4460.0,
+              "change_pct": -48.82,
+              "strictly_declining": true
+            },
+            {
+              "channel": "Swiggy",
+              "monthly_revenue_inr": {
+                "2026-05": 7245.0,
+                "2026-06": 5495.0,
+                "2026-07": 7255.0
+              },
+              "change_inr": 10.0,
+              "change_pct": 0.14,
+              "strictly_declining": false
+            },
+            {
+              "channel": "Zomato",
+              "monthly_revenue_inr": {
+                "2026-05": 4075.0,
+                "2026-06": 12250.0,
+                "2026-07": 4920.0
+              },
+              "change_inr": 845.0,
+              "change_pct": 20.74,
+              "strictly_declining": false
+            }
+          ],
+          "worst_channel": "Dine-in",
+          "decline_concentrated_in_one_channel": true,
+          "prior_window": {
+            "start": "2026-02-01",
+            "end": "2026-04-30",
+            "revenue_net_inr": 69064.0
+          },
+          "current_window_revenue_inr": 77090.0,
+          "vs_prior_window_change_inr": 8026.0,
+          "vs_prior_window_change_pct": 11.62,
+          "is_break_in_trend": false,
+          "city": "Hyderabad",
+          "city_trend": {
+            "change_pct": -4.03,
+            "strictly_declining": false,
+            "monthly_revenue_inr": {
+              "2026-05": 129210.0,
+              "2026-06": 131670.0,
+              "2026-07": 124005.0
+            }
+          },
+          "store_specific_vs_market_wide": "store-specific"
+        }
+      },
+      {
+        "store_id": "ST015",
+        "store_name": "QuickBite Kolkata 15",
+        "city": "Kolkata",
+        "region": "East",
+        "monthly_revenue_inr": {
+          "2026-05": 18830.0,
+          "2026-06": 16135.0,
+          "2026-07": 14645.0
+        },
+        "window_revenue_inr": 49610.0,
+        "change_inr": -4185.0,
+        "change_pct": -22.23,
+        "declined_every_month": true,
+        "diagnostics": {
+          "monthly": [
+            {
+              "MONTH_KEY": "2026-05",
+              "revenue_net_inr": 18830.0,
+              "orders": 28,
+              "units": 82,
+              "aov_inr": 672.5,
+              "units_per_order": 2.93,
+              "distinct_identified_customers": 20
+            },
+            {
+              "MONTH_KEY": "2026-06",
+              "revenue_net_inr": 16135.0,
+              "orders": 26,
+              "units": 72,
+              "aov_inr": 620.58,
+              "units_per_order": 2.77,
+              "distinct_identified_customers": 15
+            },
+            {
+              "MONTH_KEY": "2026-07",
+              "revenue_net_inr": 14645.0,
+              "orders": 24,
+              "units": 65,
+              "aov_inr": 610.21,
+              "units_per_order": 2.71,
+              "distinct_identified_customers": 17
+            }
+          ],
+          "orders_change_pct": -14.29,
+          "aov_change_pct": -9.26,
+          "units_per_order_change_pct": -7.52,
+          "identified_customers_change_pct": -15.0,
+          "decomposition": {
+            "revenue_change_inr": -4185.0,
+            "attributable_to_order_volume_inr": -2690.0,
+            "attributable_to_basket_size_inr": -1744.17,
+            "primary_driver": "order volume"
+          },
+          "by_channel": [
+            {
+              "channel": "Zomato",
+              "monthly_revenue_inr": {
+                "2026-05": 8820.0,
+                "2026-06": 3990.0,
+                "2026-07": 1745.0
+              },
+              "change_inr": -7075.0,
+              "change_pct": -80.22,
+              "strictly_declining": true
+            },
+            {
+              "channel": "Takeaway",
+              "monthly_revenue_inr": {
+                "2026-05": 2875.0,
+                "2026-06": 6480.0,
+                "2026-07": 640.0
+              },
+              "change_inr": -2235.0,
+              "change_pct": -77.74,
+              "strictly_declining": false
+            },
+            {
+              "channel": "Dine-in",
+              "monthly_revenue_inr": {
+                "2026-05": 4925.0,
+                "2026-06": 3830.0,
+                "2026-07": 3755.0
+              },
+              "change_inr": -1170.0,
+              "change_pct": -23.76,
+              "strictly_declining": true
+            },
+            {
+              "channel": "Swiggy",
+              "monthly_revenue_inr": {
+                "2026-05": 2210.0,
+                "2026-06": 1835.0,
+                "2026-07": 8505.0
+              },
+              "change_inr": 6295.0,
+              "change_pct": 284.84,
+              "strictly_declining": false
+            }
+          ],
+          "worst_channel": "Zomato",
+          "decline_concentrated_in_one_channel": true,
+          "prior_window": {
+            "start": "2026-02-01",
+            "end": "2026-04-30",
+            "revenue_net_inr": 52691.0
+          },
+          "current_window_revenue_inr": 49610.0,
+          "vs_prior_window_change_inr": -3081.0,
+          "vs_prior_window_change_pct": -5.85,
+          "is_break_in_trend": true,
+          "city": "Kolkata",
+          "city_trend": {
+            "change_pct": -1.3,
+            "strictly_declining": false,
+            "monthly_revenue_inr": {
+              "2026-05": 108150.5,
+              "2026-06": 108819.5,
+              "2026-07": 106741.0
+            }
+          },
+          "store_specific_vs_market_wide": "store-specific"
+        }
+      },
+      {
+        "store_id": "ST011",
+        "store_name": "QuickBite Delhi 11",
+        "city": "Delhi",
+        "region": "North",
+        "monthly_revenue_inr": {
+          "2026-05": 21105.0,
+          "2026-06": 17755.0,
+          "2026-07": 16425.0
+        },
+        "window_revenue_inr": 55285.0,
+        "change_inr": -4680.0,
+        "change_pct": -22.17,
+        "declined_every_month": true,
+        "diagnostics": {
+          "monthly": [
+            {
+              "MONTH_KEY": "2026-05",
+              "revenue_net_inr": 21105.0,
+              "orders": 32,
+              "units": 91,
+              "aov_inr": 659.53,
+              "units_per_order": 2.84,
+              "distinct_identified_customers": 24
+            },
+            {
+              "MONTH_KEY": "2026-06",
+              "revenue_net_inr": 17755.0,
+              "orders": 28,
+              "units": 72,
+              "aov_inr": 634.11,
+              "units_per_order": 2.57,
+              "distinct_identified_customers": 20
+            },
+            {
+              "MONTH_KEY": "2026-07",
+              "revenue_net_inr": 16425.0,
+              "orders": 29,
+              "units": 70,
+              "aov_inr": 566.38,
+              "units_per_order": 2.41,
+              "distinct_identified_customers": 25
+            }
+          ],
+          "orders_change_pct": -9.38,
+          "aov_change_pct": -14.12,
+          "units_per_order_change_pct": -15.12,
+          "identified_customers_change_pct": 4.17,
+          "decomposition": {
+            "revenue_change_inr": -4680.0,
+            "attributable_to_order_volume_inr": -1978.59,
+            "attributable_to_basket_size_inr": -2980.86,
+            "primary_driver": "basket size"
+          },
+          "by_channel": [
+            {
+              "channel": "Dine-in",
+              "monthly_revenue_inr": {
+                "2026-05": 8765.0,
+                "2026-06": 2995.0,
+                "2026-07": 3450.0
+              },
+              "change_inr": -5315.0,
+              "change_pct": -60.64,
+              "strictly_declining": false
+            },
+            {
+              "channel": "Zomato",
+              "monthly_revenue_inr": {
+                "2026-05": 5850.0,
+                "2026-06": 4805.0,
+                "2026-07": 1660.0
+              },
+              "change_inr": -4190.0,
+              "change_pct": -71.62,
+              "strictly_declining": true
+            },
+            {
+              "channel": "Takeaway",
+              "monthly_revenue_inr": {
+                "2026-05": 3105.0,
+                "2026-06": 6465.0,
+                "2026-07": 3365.0
+              },
+              "change_inr": 260.0,
+              "change_pct": 8.37,
+              "strictly_declining": false
+            },
+            {
+              "channel": "Swiggy",
+              "monthly_revenue_inr": {
+                "2026-05": 3385.0,
+                "2026-06": 3490.0,
+                "2026-07": 7950.0
+              },
+              "change_inr": 4565.0,
+              "change_pct": 134.86,
+              "strictly_declining": false
+            }
+          ],
+          "worst_channel": "Dine-in",
+          "decline_concentrated_in_one_channel": true,
+          "prior_window": {
+            "start": "2026-02-01",
+            "end": "2026-04-30",
+            "revenue_net_inr": 59470.5
+          },
+          "current_window_revenue_inr": 55285.0,
+          "vs_prior_window_change_inr": -4185.5,
+          "vs_prior_window_change_pct": -7.04,
+          "is_break_in_trend": true,
+          "city": "Delhi",
+          "city_trend": {
+            "change_pct": 5.16,
+            "strictly_declining": false,
+            "monthly_revenue_inr": {
+              "2026-05": 120794.5,
+              "2026-06": 119901.0,
+              "2026-07": 127033.0
+            }
+          },
+          "store_specific_vs_market_wide": "store-specific"
+        }
+      },
+      {
+        "store_id": "ST010",
+        "store_name": "QuickBite Mumbai 10",
+        "city": "Mumbai",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 25045.0,
+          "2026-06": 22375.0,
+          "2026-07": 19815.0
+        },
+        "window_revenue_inr": 67235.0,
+        "change_inr": -5230.0,
+        "change_pct": -20.88,
+        "declined_every_month": true,
+        "diagnostics": {
+          "monthly": [
+            {
+              "MONTH_KEY": "2026-05",
+              "revenue_net_inr": 25045.0,
+              "orders": 41,
+              "units": 109,
+              "aov_inr": 610.85,
+              "units_per_order": 2.66,
+              "distinct_identified_customers": 30
+            },
+            {
+              "MONTH_KEY": "2026-06",
+              "revenue_net_inr": 22375.0,
+              "orders": 34,
+              "units": 94,
+              "aov_inr": 658.09,
+              "units_per_order": 2.76,
+              "distinct_identified_customers": 28
+            },
+            {
+              "MONTH_KEY": "2026-07",
+              "revenue_net_inr": 19815.0,
+              "orders": 31,
+              "units": 89,
+              "aov_inr": 639.19,
+              "units_per_order": 2.87,
+              "distinct_identified_customers": 23
+            }
+          ],
+          "orders_change_pct": -24.39,
+          "aov_change_pct": 4.64,
+          "units_per_order_change_pct": 7.99,
+          "identified_customers_change_pct": -23.33,
+          "decomposition": {
+            "revenue_change_inr": -5230.0,
+            "attributable_to_order_volume_inr": -6108.54,
+            "attributable_to_basket_size_inr": 1161.94,
+            "primary_driver": "order volume"
+          },
+          "by_channel": [
+            {
+              "channel": "Dine-in",
+              "monthly_revenue_inr": {
+                "2026-05": 7840.0,
+                "2026-06": 4750.0,
+                "2026-07": 4310.0
+              },
+              "change_inr": -3530.0,
+              "change_pct": -45.03,
+              "strictly_declining": true
+            },
+            {
+              "channel": "Takeaway",
+              "monthly_revenue_inr": {
+                "2026-05": 7230.0,
+                "2026-06": 4505.0,
+                "2026-07": 5525.0
+              },
+              "change_inr": -1705.0,
+              "change_pct": -23.58,
+              "strictly_declining": false
+            },
+            {
+              "channel": "Swiggy",
+              "monthly_revenue_inr": {
+                "2026-05": 5430.0,
+                "2026-06": 6505.0,
+                "2026-07": 5280.0
+              },
+              "change_inr": -150.0,
+              "change_pct": -2.76,
+              "strictly_declining": false
+            },
+            {
+              "channel": "Zomato",
+              "monthly_revenue_inr": {
+                "2026-05": 4545.0,
+                "2026-06": 6615.0,
+                "2026-07": 4700.0
+              },
+              "change_inr": 155.0,
+              "change_pct": 3.41,
+              "strictly_declining": false
+            }
+          ],
+          "worst_channel": "Dine-in",
+          "decline_concentrated_in_one_channel": true,
+          "prior_window": {
+            "start": "2026-02-01",
+            "end": "2026-04-30",
+            "revenue_net_inr": 69232.5
+          },
+          "current_window_revenue_inr": 67235.0,
+          "vs_prior_window_change_inr": -1997.5,
+          "vs_prior_window_change_pct": -2.89,
+          "is_break_in_trend": true,
+          "city": "Mumbai",
+          "city_trend": {
+            "change_pct": 0.32,
+            "strictly_declining": false,
+            "monthly_revenue_inr": {
+              "2026-05": 165435.0,
+              "2026-06": 155470.0,
+              "2026-07": 165970.0
+            }
+          },
+          "store_specific_vs_market_wide": "store-specific"
+        }
+      },
+      {
+        "store_id": "ST016",
+        "store_name": "QuickBite Chennai 16",
+        "city": "Chennai",
+        "region": "South",
+        "monthly_revenue_inr": {
+          "2026-05": 26355.0,
+          "2026-06": 24645.0,
+          "2026-07": 22605.0
+        },
+        "window_revenue_inr": 73605.0,
+        "change_inr": -3750.0,
+        "change_pct": -14.23,
+        "declined_every_month": true,
+        "diagnostics": {
+          "monthly": [
+            {
+              "MONTH_KEY": "2026-05",
+              "revenue_net_inr": 26355.0,
+              "orders": 43,
+              "units": 118,
+              "aov_inr": 612.91,
+              "units_per_order": 2.74,
+              "distinct_identified_customers": 34
+            },
+            {
+              "MONTH_KEY": "2026-06",
+              "revenue_net_inr": 24645.0,
+              "orders": 38,
+              "units": 107,
+              "aov_inr": 648.55,
+              "units_per_order": 2.82,
+              "distinct_identified_customers": 25
+            },
+            {
+              "MONTH_KEY": "2026-07",
+              "revenue_net_inr": 22605.0,
+              "orders": 39,
+              "units": 104,
+              "aov_inr": 579.62,
+              "units_per_order": 2.67,
+              "distinct_identified_customers": 36
+            }
+          ],
+          "orders_change_pct": -9.3,
+          "aov_change_pct": -5.43,
+          "units_per_order_change_pct": -2.82,
+          "identified_customers_change_pct": 5.88,
+          "decomposition": {
+            "revenue_change_inr": -3750.0,
+            "attributable_to_order_volume_inr": -2451.63,
+            "attributable_to_basket_size_inr": -1431.54,
+            "primary_driver": "order volume"
+          },
+          "by_channel": [
+            {
+              "channel": "Swiggy",
+              "monthly_revenue_inr": {
+                "2026-05": 8755.0,
+                "2026-06": 7080.0,
+                "2026-07": 4605.0
+              },
+              "change_inr": -4150.0,
+              "change_pct": -47.4,
+              "strictly_declining": true
+            },
+            {
+              "channel": "Takeaway",
+              "monthly_revenue_inr": {
+                "2026-05": 7370.0,
+                "2026-06": 5865.0,
+                "2026-07": 5955.0
+              },
+              "change_inr": -1415.0,
+              "change_pct": -19.2,
+              "strictly_declining": false
+            },
+            {
+              "channel": "Dine-in",
+              "monthly_revenue_inr": {
+                "2026-05": 5000.0,
+                "2026-06": 5875.0,
+                "2026-07": 4580.0
+              },
+              "change_inr": -420.0,
+              "change_pct": -8.4,
+              "strictly_declining": false
+            },
+            {
+              "channel": "Zomato",
+              "monthly_revenue_inr": {
+                "2026-05": 5230.0,
+                "2026-06": 5825.0,
+                "2026-07": 7465.0
+              },
+              "change_inr": 2235.0,
+              "change_pct": 42.73,
+              "strictly_declining": false
+            }
+          ],
+          "worst_channel": "Swiggy",
+          "decline_concentrated_in_one_channel": true,
+          "prior_window": {
+            "start": "2026-02-01",
+            "end": "2026-04-30",
+            "revenue_net_inr": 46200.0
+          },
+          "current_window_revenue_inr": 73605.0,
+          "vs_prior_window_change_inr": 27405.0,
+          "vs_prior_window_change_pct": 59.32,
+          "is_break_in_trend": false,
+          "city": "Chennai",
+          "city_trend": {
+            "change_pct": 7.55,
+            "strictly_declining": false,
+            "monthly_revenue_inr": {
+              "2026-05": 121090.0,
+              "2026-06": 114260.0,
+              "2026-07": 130235.0
+            }
+          },
+          "store_specific_vs_market_wide": "store-specific"
+        }
+      },
+      {
+        "store_id": "ST007",
+        "store_name": "QuickBite Kolkata 07",
+        "city": "Kolkata",
+        "region": "East",
+        "monthly_revenue_inr": {
+          "2026-05": 15460.5,
+          "2026-06": 15154.5,
+          "2026-07": 13536.0
+        },
+        "window_revenue_inr": 44151.0,
+        "change_inr": -1924.5,
+        "change_pct": -12.45,
+        "declined_every_month": true,
+        "diagnostics": {
+          "monthly": [
+            {
+              "MONTH_KEY": "2026-05",
+              "revenue_net_inr": 15460.5,
+              "orders": 27,
+              "units": 77,
+              "aov_inr": 572.61,
+              "units_per_order": 2.85,
+              "distinct_identified_customers": 19
+            },
+            {
+              "MONTH_KEY": "2026-06",
+              "revenue_net_inr": 15154.5,
+              "orders": 31,
+              "units": 81,
+              "aov_inr": 488.85,
+              "units_per_order": 2.61,
+              "distinct_identified_customers": 19
+            },
+            {
+              "MONTH_KEY": "2026-07",
+              "revenue_net_inr": 13536.0,
+              "orders": 26,
+              "units": 69,
+              "aov_inr": 520.62,
+              "units_per_order": 2.65,
+              "distinct_identified_customers": 18
+            }
+          ],
+          "orders_change_pct": -3.7,
+          "aov_change_pct": -9.08,
+          "units_per_order_change_pct": -6.94,
+          "identified_customers_change_pct": -5.26,
+          "decomposition": {
+            "revenue_change_inr": -1924.5,
+            "attributable_to_order_volume_inr": -572.61,
+            "attributable_to_basket_size_inr": -1403.88,
+            "primary_driver": "basket size"
+          },
+          "by_channel": [
+            {
+              "channel": "Takeaway",
+              "monthly_revenue_inr": {
+                "2026-05": 5280.0,
+                "2026-06": 4272.0,
+                "2026-07": 2709.0
+              },
+              "change_inr": -2571.0,
+              "change_pct": -48.69,
+              "strictly_declining": true
+            },
+            {
+              "channel": "Dine-in",
+              "monthly_revenue_inr": {
+                "2026-05": 4396.5,
+                "2026-06": 1908.0,
+                "2026-07": 3339.0
+              },
+              "change_inr": -1057.5,
+              "change_pct": -24.05,
+              "strictly_declining": false
+            },
+            {
+              "channel": "Zomato",
+              "monthly_revenue_inr": {
+                "2026-05": 4686.0,
+                "2026-06": 6117.0,
+                "2026-07": 4729.5
+              },
+              "change_inr": 43.5,
+              "change_pct": 0.93,
+              "strictly_declining": false
+            },
+            {
+              "channel": "Swiggy",
+              "monthly_revenue_inr": {
+                "2026-05": 1098.0,
+                "2026-06": 2857.5,
+                "2026-07": 2758.5
+              },
+              "change_inr": 1660.5,
+              "change_pct": 151.23,
+              "strictly_declining": false
+            }
+          ],
+          "worst_channel": "Takeaway",
+          "decline_concentrated_in_one_channel": true,
+          "prior_window": {
+            "start": "2026-02-01",
+            "end": "2026-04-30",
+            "revenue_net_inr": 44875.0
+          },
+          "current_window_revenue_inr": 44151.0,
+          "vs_prior_window_change_inr": -724.0,
+          "vs_prior_window_change_pct": -1.61,
+          "is_break_in_trend": true,
+          "city": "Kolkata",
+          "city_trend": {
+            "change_pct": -1.3,
+            "strictly_declining": false,
+            "monthly_revenue_inr": {
+              "2026-05": 108150.5,
+              "2026-06": 108819.5,
+              "2026-07": 106741.0
+            }
+          },
+          "store_specific_vs_market_wide": "store-specific"
+        }
+      },
+      {
+        "store_id": "ST002",
+        "store_name": "QuickBite Mumbai 02",
+        "city": "Mumbai",
+        "region": "West",
+        "monthly_revenue_inr": {
+          "2026-05": 21215.0,
+          "2026-06": 20760.0,
+          "2026-07": 20350.0
+        },
+        "window_revenue_inr": 62325.0,
+        "change_inr": -865.0,
+        "change_pct": -4.08,
+        "declined_every_month": true,
+        "diagnostics": {
+          "monthly": [
+            {
+              "MONTH_KEY": "2026-05",
+              "revenue_net_inr": 21215.0,
+              "orders": 28,
+              "units": 84,
+              "aov_inr": 757.68,
+              "units_per_order": 3.0,
+              "distinct_identified_customers": 17
+            },
+            {
+              "MONTH_KEY": "2026-06",
+              "revenue_net_inr": 20760.0,
+              "orders": 30,
+              "units": 85,
+              "aov_inr": 692.0,
+              "units_per_order": 2.83,
+              "distinct_identified_customers": 22
+            },
+            {
+              "MONTH_KEY": "2026-07",
+              "revenue_net_inr": 20350.0,
+              "orders": 27,
+              "units": 79,
+              "aov_inr": 753.7,
+              "units_per_order": 2.93,
+              "distinct_identified_customers": 16
+            }
+          ],
+          "orders_change_pct": -3.57,
+          "aov_change_pct": -0.52,
+          "units_per_order_change_pct": -2.47,
+          "identified_customers_change_pct": -5.88,
+          "decomposition": {
+            "revenue_change_inr": -865.0,
+            "attributable_to_order_volume_inr": -757.68,
+            "attributable_to_basket_size_inr": -111.3,
+            "primary_driver": "order volume"
+          },
+          "by_channel": [
+            {
+              "channel": "Takeaway",
+              "monthly_revenue_inr": {
+                "2026-05": 3730.0,
+                "2026-06": 2245.0,
+                "2026-07": 820.0
+              },
+              "change_inr": -2910.0,
+              "change_pct": -78.02,
+              "strictly_declining": true
+            },
+            {
+              "channel": "Swiggy",
+              "monthly_revenue_inr": {
+                "2026-05": 3885.0,
+                "2026-06": 4950.0,
+                "2026-07": 2930.0
+              },
+              "change_inr": -955.0,
+              "change_pct": -24.58,
+              "strictly_declining": false
+            },
+            {
+              "channel": "Zomato",
+              "monthly_revenue_inr": {
+                "2026-05": 6645.0,
+                "2026-06": 5515.0,
+                "2026-07": 7030.0
+              },
+              "change_inr": 385.0,
+              "change_pct": 5.79,
+              "strictly_declining": false
+            },
+            {
+              "channel": "Dine-in",
+              "monthly_revenue_inr": {
+                "2026-05": 6955.0,
+                "2026-06": 8050.0,
+                "2026-07": 9570.0
+              },
+              "change_inr": 2615.0,
+              "change_pct": 37.6,
+              "strictly_declining": false
+            }
+          ],
+          "worst_channel": "Takeaway",
+          "decline_concentrated_in_one_channel": true,
+          "prior_window": {
+            "start": "2026-02-01",
+            "end": "2026-04-30",
+            "revenue_net_inr": 56180.0
+          },
+          "current_window_revenue_inr": 62325.0,
+          "vs_prior_window_change_inr": 6145.0,
+          "vs_prior_window_change_pct": 10.94,
+          "is_break_in_trend": false,
+          "city": "Mumbai",
+          "city_trend": {
+            "change_pct": 0.32,
+            "strictly_declining": false,
+            "monthly_revenue_inr": {
+              "2026-05": 165435.0,
+              "2026-06": 155470.0,
+              "2026-07": 165970.0
+            }
+          },
+          "store_specific_vs_market_wide": "store-specific"
+        }
+      }
+    ],
+    "note": "'declined_every_month' requires revenue to fall in every consecutive month in the window, which is a stricter and more meaningful test than simply comparing the endpoints."
+  }
+}

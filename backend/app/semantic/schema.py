@@ -701,7 +701,11 @@ BUSINESS_RULES: Final[list[str]] = [
         f"known defect in the source data, held below "
         f"{MAX_LINE_VARIANCE_REVENUE_PCT}% of revenue by the quality gate - so a "
         f"revenue total taken from the line grain will not match the canonical "
-        f"figure."
+        f"figure. The affected orders are concentrated in the most recent "
+        f"months, so the gap is several times wider inside a recent window "
+        f"(around 0.4% over the last 3 months) than across the full year "
+        f"(around 0.1%). This makes the rule matter most for exactly the "
+        f"questions people ask most."
     ),
     (
         "Prefer the marts (mart_store_month, mart_city_month, "

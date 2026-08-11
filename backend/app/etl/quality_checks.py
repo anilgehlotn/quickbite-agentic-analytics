@@ -886,6 +886,29 @@ def check_line_to_header_reconciliation(
         (LINE_RECONCILIATION_TOLERANCE_INR,),
     ).fetchone()
 
+    # Where the variance sits matters as much as its size: it is concentrated in
+    # the most recent months, so its share of a recent window is several times
+    # its share of the full year.
+    by_month = {
+        month: {"orders": int(count), "variance_inr": round(float(variance), 2)}
+        for month, count, variance in connection.execute(
+            """
+            SELECT month_key, COUNT(*), SUM(variance)
+            FROM (
+                SELECT o.month_key AS month_key,
+                       ABS(SUM(l.line_net_value) - o.net_before_tax) AS variance
+                FROM fact_orders AS o
+                JOIN fact_order_lines AS l ON l.order_id = o.order_id
+                GROUP BY o.order_id, o.month_key, o.net_before_tax
+                HAVING ABS(SUM(l.line_net_value) - o.net_before_tax) > ?
+            )
+            GROUP BY month_key
+            ORDER BY month_key
+            """,
+            (LINE_RECONCILIATION_TOLERANCE_INR,),
+        )
+    }
+
     order_pct = percentage(affected_orders, total_orders)
     revenue_pct = percentage(variance_inr, total_revenue)
 
@@ -904,10 +927,19 @@ def check_line_to_header_reconciliation(
     if passed:
         message = "every order's lines sum to its header net_before_tax"
     else:
+        span = (
+            f" All affected orders fall in {min(by_month)}..{max(by_month)}, "
+            f"{len(by_month)} of {EXPECTED_MONTH_COUNT} months, so the variance "
+            f"is a larger share of any window inside that span than of the full "
+            f"year."
+            if by_month
+            else ""
+        )
         message = (
             f"{affected_orders:,} of {total_orders:,} orders ({order_pct:.2f}%) "
             f"have lines that do not sum to the header net_before_tax; total "
-            f"variance {variance_inr:,.2f} INR ({revenue_pct:.4f}% of revenue). "
+            f"variance {variance_inr:,.2f} INR ({revenue_pct:.4f}% of full-year "
+            f"revenue).{span} "
             f"{'Within' if within_tolerance else 'EXCEEDS'} the accepted "
             f"threshold of {MAX_LINE_VARIANCE_ORDER_PCT}% of orders / "
             f"{MAX_LINE_VARIANCE_REVENUE_PCT}% of revenue. {consequence}"
@@ -926,6 +958,8 @@ def check_line_to_header_reconciliation(
             "variance_inr": round(float(variance_inr), 2),
             "total_revenue_inr": round(total_revenue, 2),
             "variance_revenue_pct": revenue_pct,
+            "by_month": by_month,
+            "affected_months": sorted(by_month),
             "tolerance_inr": LINE_RECONCILIATION_TOLERANCE_INR,
             "max_order_pct": MAX_LINE_VARIANCE_ORDER_PCT,
             "max_revenue_pct": MAX_LINE_VARIANCE_REVENUE_PCT,
