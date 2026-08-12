@@ -1,0 +1,12 @@
+# Dependencies for building docs/Agent_Architecture.pdf.
+#
+# Deliberately separate from backend/requirements.txt. The application does not
+# need ReportLab, and adding it there would install it on every CI run and on
+# the deployment host to no purpose.
+#
+#   pip install -r requirements-docs.txt
+#   python scripts/build_architecture_pdf.py
+#
+# ReportLab is pure Python and generates the PDF with no network access, no
+# headless browser and no system libraries.
+reportlab==5.0.0
