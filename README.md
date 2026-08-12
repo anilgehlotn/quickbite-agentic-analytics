@@ -6,9 +6,9 @@ numbers arithmetically, and explain what the result means.
 
 [![ci](https://github.com/anilgehlotn/quickbite-agentic-analytics/actions/workflows/ci.yml/badge.svg)](https://github.com/anilgehlotn/quickbite-agentic-analytics/actions/workflows/ci.yml)
 
-- **Live application:** _(add the Vercel URL here)_
-- **API:** _(add the Render URL here)_ — try `/api/health` and `/api/verify`
-- **Demo video:** _(add the link here)_
+- **Live application:** [quickbite-agentic-analytics.vercel.app](https://quickbite-agentic-analytics.vercel.app)
+- **API:** [quickbite-analytics-api.onrender.com](https://quickbite-analytics-api.onrender.com) — try `/api/health` and `/api/verify`
+- **Demo video:** [watch the demo on Google Drive](https://drive.google.com/drive/folders/1deZuT6HP__SPFqAJHvHHBWLCWxX0Jt3_?usp=sharing) (folder — open the video inside)
 
 ---
 

@@ -30,7 +30,7 @@ services:
       - key: CORS_ORIGINS
         # Set in the dashboard AFTER the frontend is deployed, as a
         # comma-separated list, e.g.
-        #   https://quickbite-analytics.vercel.app,http://localhost:3000
+        #   https://quickbite-agentic-analytics.vercel.app,http://localhost:3000
         # See the circular dependency section of docs/DEPLOYMENT.md.
         sync: false
 

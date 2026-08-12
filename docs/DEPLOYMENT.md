@@ -2,10 +2,10 @@
 
 QuickBite runs as two services:
 
-| Service  | Platform | Root directory | URL shape                                    |
-| -------- | -------- | -------------- | -------------------------------------------- |
-| API      | Render   | `backend`      | `https://quickbite-analytics-api.onrender.com` |
-| Frontend | Vercel   | `frontend`     | `https://<project>.vercel.app`               |
+| Service  | Platform | Root directory | Deployed URL                                        |
+| -------- | -------- | -------------- | --------------------------------------------------- |
+| API      | Render   | `backend`      | `https://quickbite-analytics-api.onrender.com`      |
+| Frontend | Vercel   | `frontend`     | `https://quickbite-agentic-analytics.vercel.app`    |
 
 There is no database to provision. The SQLite file is committed to the
 repository, so the API deploys as a stateless, read-only service.
@@ -123,7 +123,7 @@ the running service will actually allow.
    > not just a restart.
 
 5. Click **Deploy** and note the assigned URL, e.g.
-   `https://quickbite-analytics.vercel.app`.
+   `https://quickbite-agentic-analytics.vercel.app`.
 
 At this point the page loads but the status card will show **Unreachable** — the
 API is rejecting the browser's origin. That is expected, and Step 4 fixes it.
@@ -146,7 +146,7 @@ Step 4   update API's CORS   → API now accepts the frontend  ✅
 2. Edit `CORS_ORIGINS` to the comma-separated list:
 
    ```
-   https://quickbite-analytics.vercel.app,http://localhost:3000
+   https://quickbite-agentic-analytics.vercel.app,http://localhost:3000
    ```
 
    - No spaces are required, though they are tolerated and stripped.
@@ -216,10 +216,10 @@ Treat it as a reduction in the odds of a cold start, not a guarantee:
 If a cold start would be genuinely costly — a live demo, or a review window you
 cannot be present for — add a **second, independent pinger** as well. Any
 external uptime monitor on a 5-to-10-minute interval against
-`https://<render-url>/api/health` will do (UptimeRobot, Better Stack, Cronitor
-and similar all have free tiers that cover this). Two sources that fail
-independently are the cheapest insurance available here, and the endpoint is
-public, read-only and cheap to call.
+`https://quickbite-analytics-api.onrender.com/api/health` will do (UptimeRobot,
+Better Stack, Cronitor and similar all have free tiers that cover this). Two
+sources that fail independently are the cheapest insurance available here, and
+the endpoint is public, read-only and cheap to call.
 
 Failing all that, load the page once a minute or two before demonstrating, and
 let the wake finish while you are still talking.
@@ -228,12 +228,13 @@ let the wake finish while you are still talking.
 
 ## Verification checklist
 
-Run these against the deployed URLs. All four must pass.
+Run these against the deployed URLs. All four must pass. The values below are
+this deployment's; change the two assignments if you deployed your own copy.
 
 **API**
 
 ```bash
-API=https://<your-api>.onrender.com
+API=https://quickbite-analytics-api.onrender.com
 
 # 1. Service identifies itself
 curl -s $API/ | python3 -m json.tool
@@ -252,11 +253,13 @@ curl -s $API/api/schema | python3 -m json.tool | head -20
 **CORS**
 
 ```bash
+ORIGIN=https://quickbite-agentic-analytics.vercel.app
+
 # 4. The deployed frontend origin is allowed
 curl -s -I -X OPTIONS $API/health \
-  -H "Origin: https://<your-project>.vercel.app" \
+  -H "Origin: $ORIGIN" \
   -H "Access-Control-Request-Method: GET" | grep -i access-control-allow-origin
-#    expect: access-control-allow-origin: https://<your-project>.vercel.app
+#    expect: access-control-allow-origin: https://quickbite-agentic-analytics.vercel.app
 #    no header returned means Step 4 is incomplete or the origin does not match
 #    exactly (check for a trailing slash or http vs https)
 ```
