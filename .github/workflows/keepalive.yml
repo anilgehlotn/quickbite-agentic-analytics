@@ -1,0 +1,75 @@
+# Keeps the deployed backend from going to sleep.
+#
+# The hosting free tier suspends a service after roughly fifteen minutes idle,
+# and waking it costs up to fifty seconds. That delay lands on whoever opens
+# the link first, which is exactly the person it should not land on. Polling
+# health every ten minutes keeps the service in memory at no cost and with
+# nothing running locally.
+#
+# Two honest caveats:
+#
+#   * GitHub's scheduled workflows are best-effort. Under load a cron run can
+#     be delayed by several minutes or skipped entirely, so this reduces the
+#     chance of a cold start rather than eliminating it. The frontend still
+#     handles a slow first request properly: it keeps waiting, and after
+#     fifteen seconds it explains that the backend may be waking rather than
+#     implying a failure.
+#   * Scheduled workflows on a public repository are disabled automatically
+#     after sixty days without activity. If this repository goes quiet, expect
+#     the first request after that to be slow again.
+#
+# BACKEND_URL is a repository variable, not a secret: it is a public URL, and
+# storing it as a variable means it is visible in the workflow log, which makes
+# a misconfiguration obvious instead of silent.
+
+name: keepalive
+
+on:
+  schedule:
+    # Every ten minutes. Cron is UTC.
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    name: Ping backend health
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the backend is awake
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+        run: |
+          if [ -z "${BACKEND_URL}" ]; then
+            echo "BACKEND_URL repository variable is not set."
+            echo "Set it under Settings > Secrets and variables > Actions > Variables."
+            exit 1
+          fi
+
+          echo "Pinging ${BACKEND_URL}/api/health"
+
+          # --max-time covers a cold start: a slow reply is the success case
+          # here, not a failure. Retries cover a service that is still booting.
+          response=$(curl --silent --show-error --location \
+            --max-time 90 \
+            --retry 3 --retry-delay 15 --retry-connrefused \
+            --write-out "\n%{http_code}" \
+            "${BACKEND_URL}/api/health")
+
+          body=$(echo "${response}" | sed '$d')
+          code=$(echo "${response}" | tail -n1)
+
+          echo "HTTP ${code}"
+          echo "${body}"
+
+          if [ "${code}" != "200" ]; then
+            echo "Health check did not return 200."
+            exit 1
+          fi

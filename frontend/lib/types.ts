@@ -176,6 +176,15 @@ export interface ProviderHealth {
   model: string;
 }
 
+/**
+ * What the service can currently do.
+ *
+ * "cache_only" is the state the deployment is most likely to be found in: the
+ * data layer is healthy and the evaluation questions answer instantly, but no
+ * model provider is reachable so new questions cannot be planned.
+ */
+export type ServiceMode = "full" | "cache_only" | "offline";
+
 /** Service readiness, from GET /api/health. */
 export interface HealthResponse {
   status: "ok" | "degraded";
@@ -185,6 +194,8 @@ export interface HealthResponse {
   providers: ProviderHealth[];
   providers_configured: string[];
   cached_answers: number;
+  degraded: boolean;
+  mode: ServiceMode;
   data_asof: string;
   environment: string;
   version: string;

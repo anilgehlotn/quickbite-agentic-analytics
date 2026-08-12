@@ -24,7 +24,7 @@ from typing import Any, Final
 from fastapi import APIRouter, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.agents.contracts import AnalysisResponse
+from app.agents.contracts import AnalysisResponse, Insight
 from app.agents.orchestrator import CANONICAL_QUESTIONS, Orchestrator
 from app.config import settings
 from app.core.cache import get_cache, get_rate_limiter, normalise_question
@@ -50,6 +50,11 @@ REQUEST_ID_HEADER: Final[str] = "X-Request-ID"
 
 STATUS_OK: Final[str] = "ok"
 STATUS_DEGRADED: Final[str] = "degraded"
+
+# Service modes, from most to least capable.
+MODE_FULL: Final[str] = "full"
+MODE_CACHE_ONLY: Final[str] = "cache_only"
+MODE_OFFLINE: Final[str] = "offline"
 
 
 def new_request_id() -> str:
@@ -209,6 +214,21 @@ class HealthResponse(BaseModel):
             "questions are answerable even with no provider available."
         )
     )
+    degraded: bool = Field(
+        description=(
+            "True when the service cannot do everything it normally does. "
+            "Cached answers may still be served in this state, so degraded is "
+            "not the same as unavailable."
+        )
+    )
+    mode: str = Field(
+        description=(
+            "What the service can currently do: 'full' answers new questions "
+            "and serves cached ones, 'cache_only' serves the pre-computed "
+            "evaluation questions but cannot run new analysis, and 'offline' "
+            "cannot answer at all."
+        )
+    )
     data_asof: str = Field(description="The dataset's fixed as-of date.")
     environment: str = Field(description="Deployment environment name.")
     version: str = Field(description="Application version.")
@@ -328,18 +348,50 @@ def unavailable_response(question: str, request_id: str) -> AnalysisResponse:
     Returns:
         An unanswered response carrying the explanation.
     """
-    cached = get_cache().questions()
-    suggestions = cached or [entry["question"] for entry in CANONICAL_QUESTIONS]
-    return AnalysisResponse.unanswered(
+    cache = get_cache()
+    available = [
+        entry["question"]
+        for entry in CANONICAL_QUESTIONS
+        if normalise_question(entry["question"]) in set(cache.keys())
+    ]
+    listed = available or [entry["question"] for entry in CANONICAL_QUESTIONS]
+
+    response = AnalysisResponse.unanswered(
         question=question,
         error=(
             "Live analysis is temporarily unavailable: no language model "
             "provider is currently reachable, so a new question cannot be "
-            "planned or queried. Previously computed answers are still "
-            "served, including these: "
-            + "; ".join(suggestions[:8])
+            "planned, queried or explained."
         ),
     )
+    # A refusal that only says no is accurate and useless. The reader gets the
+    # reason, the fact that the system itself is working, and the exact
+    # questions they can ask right now - which are the questions the system
+    # was built to answer.
+    response.request_id = request_id
+    response.insight = Insight(
+        headline=(
+            "Live analysis is temporarily unavailable, but "
+            f"{len(listed)} prepared analyses are ready now."
+        ),
+        narrative=(
+            "This question needs a language model to plan the analysis and "
+            "write the SQL, and no provider is currently reachable. The data "
+            "layer is unaffected: the database, the semantic layer and the "
+            "verification checks are all working, and the questions below "
+            "were computed earlier by the full agent pipeline. Each returns "
+            "instantly, with its complete agent trace, executed SQL and "
+            "verification report."
+        ),
+        key_findings=listed,
+        caveats=[
+            "Answers to the questions above were computed by the live "
+            "pipeline and stored; they are not approximations.",
+        ],
+        recommended_actions=[],
+        confidence=0.0,
+    )
+    return response
 
 
 @router.post(
@@ -403,9 +455,7 @@ async def ask(
 
     if not settings.available_providers():
         logger.warning("ask_no_provider", extra={"request_id": request_id})
-        unavailable = unavailable_response(question, request_id)
-        unavailable.request_id = request_id
-        return unavailable
+        return unavailable_response(question, request_id)
 
     result = await get_orchestrator().run(question, request_id=request_id)
     result.request_id = request_id
@@ -464,9 +514,23 @@ def health() -> HealthResponse:
     provider_health = get_llm_client().health()
     configured = settings.available_providers()
     ready = error is None and bool(configured)
+    cached = len(get_cache())
+
+    # Three states, not two. "cache_only" is the state this deployment is most
+    # likely to be found in - the database is fine, the evaluation questions
+    # answer instantly from disk, and only new questions are unavailable - and
+    # collapsing it into "degraded" would understate what still works.
+    if ready:
+        mode = MODE_FULL
+    elif error is None and cached > 0:
+        mode = MODE_CACHE_ONLY
+    else:
+        mode = MODE_OFFLINE
 
     return HealthResponse(
         status=STATUS_OK if error is None else STATUS_DEGRADED,
+        degraded=mode != MODE_FULL,
+        mode=mode,
         database_ready=error is None,
         fact_orders_rows=row_count,
         orchestrator_ready=ready,
@@ -475,7 +539,7 @@ def health() -> HealthResponse:
             for name, model in provider_health.get("models", {}).items()
         ],
         providers_configured=configured,
-        cached_answers=len(get_cache()),
+        cached_answers=cached,
         data_asof=settings.DATA_ASOF_DATE.isoformat(),
         environment=settings.ENVIRONMENT,
         version=settings.APP_VERSION,
