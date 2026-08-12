@@ -28,6 +28,7 @@ from app.agents.base import Agent, AgentError
 from app.agents.contracts import AnalysisPlan, QueryIntent
 from app.config import settings
 from app.core.logging import get_logger
+from app.semantic.entities import render_for_prompt, resolve
 from app.semantic.schema import METRIC_DEFINITIONS, get_schema_context
 
 logger = get_logger(__name__)
@@ -117,6 +118,79 @@ PLANNING RULES
 
 8. BASELINES. When the question implies a comparison ("is it down?",
    "better than before?"), set the comparison window in time_window.
+
+9. DEFAULT RATHER THAN ASK. Most questions have a sensible default and should
+   be answered, not queried back. Apply these silently and never ask about
+   them:
+   - No period given -> {last_3m_start} to {last_3m_end}.
+   - Revenue -> always tax-exclusive (net_before_tax).
+   - No channel, store, city or segment named -> all of them.
+   - "Best", "top", "worst" with no measure named -> revenue.
+   A bare month name means the most recent occurrence of that month inside
+   the data window, so "in June" is 2026-06 and "last December" is 2025-12.
+
+10. AMBIGUOUS. Set intent="ambiguous" ONLY when guessing would produce a
+   misleading answer, and supply `clarification` with one focused question and
+   two to four complete, self-contained questions the user could ask instead.
+   Do not set sub_queries. Genuine cases are narrow:
+   - A named reference that matched several different KINDS of entity, where
+     the answers differ (a product category versus one product).
+   - A metric word that could mean materially different things and the two
+     answers would name different winners.
+   Everything in rule 9 is NOT ambiguous. When in doubt, answer with the
+   default and record the assumption in reasoning.
+
+11. SHARES AND PERCENTAGES. "What percentage / share / proportion of X"
+   requires the part, the whole and the percentage as COLUMNS of one result,
+   computed in SQL with a window function:
+       SUM(...) AS revenue,
+       SUM(SUM(...)) OVER () AS total_revenue,
+       100.0 * SUM(...) / SUM(SUM(...)) OVER () AS pct_of_total
+   Never return the parts alone and leave the division to be done by reading.
+   "Delivery" is not a channel: it means Swiggy and Zomato together, so a
+   delivery share must group them and say so.
+
+12. ENTITY DEEP DIVES. "How is ST015 doing?" is not one number. Plan a
+   profile: the entity's headline metrics for the window, its month-by-month
+   series, and the same metrics for the comparable population so the reader
+   can tell good from average. Put the comparison in the SAME row where
+   possible - the entity's value, the peer average, and the difference as
+   columns.
+
+13. TWO NAMED ENTITIES. A comparison between two named things is ONE
+   sub-query grouped by that dimension and filtered to both, not two
+   sub-queries to be read side by side. Add the difference as a column when
+   there are exactly two.
+
+14. RANKING INSIDE A FILTER. "Best store in Bengaluru" ranks within the
+   filter, so the filter belongs in WHERE and the ranking in ORDER BY. Never
+   rank the whole population and then hope the filter's members appear.
+
+15. THE DIMENSIONS THAT ARE OFTEN FORGOTTEN. These all exist and questions
+   about them are answerable:
+   - Time of day -> fact_orders.order_hour (0-23).
+   - Day of week -> fact_orders.day_name; weekday/weekend -> day_type.
+   - Product mix -> dim_product.category and dim_product.veg_nonveg, joined
+     through fact_order_lines.
+   - Promotions -> dim_promotion via fact_orders.promo_id, LEFT JOIN always.
+     Promotion effectiveness compares promoted with non-promoted orders on
+     AOV and units, not on revenue alone: a discount that raises basket size
+     can still lower revenue per order.
+   - Margin -> line-level est_cogs, so gross_margin and margin_pct come from
+     fact_order_lines. This is ESTIMATED cost of goods only; it is not profit,
+     because the data holds no rent, staff or overhead.
+   - Customer segments -> dim_customer.customer_segment, LEFT JOIN always.
+     A large share of orders are anonymous walk-ins with no customer_id; a
+     segment breakdown MUST either include them as their own group or state
+     what share it excludes. Silently dropping 28% of orders is the single
+     easiest way to produce a confidently wrong segment answer.
+
+16. YEAR-ON-YEAR IS NOT AVAILABLE. The data covers {data_start} to {data_end},
+   a single twelve-month window. There is no prior year to compare against,
+   so "versus last year" cannot be answered for any period. Set
+   intent="unsupported" and say so plainly. Do NOT quietly compare against an
+   earlier part of the same year and present it as year-on-year: that is the
+   kind of answer that is wrong in a way the reader cannot detect.
 """
 
 
@@ -140,6 +214,8 @@ class PlannerAgent(Agent[AnalysisPlan]):
             last_3m_start=settings.LAST_3M_START.isoformat(),
             last_3m_end=settings.LAST_3M_END.isoformat(),
             metric_names=", ".join(sorted(METRIC_DEFINITIONS)),
+            data_start=settings.DATA_START_DATE.isoformat(),
+            data_end=settings.DATA_ASOF_DATE.isoformat(),
         )
         example = AnalysisPlan.model_config["json_schema_extra"]["example"]
 
@@ -156,6 +232,28 @@ class PlannerAgent(Agent[AnalysisPlan]):
             f"{json.dumps(example, indent=2)}\n"
         )
 
+    def build_user_prompt(self, question: str) -> str:
+        """Assemble the user message, with any resolved entities attached.
+
+        Entity resolution happens in code against the real dimension values,
+        and the canonical values are handed over as facts. Left to itself a
+        model asked about "the Bangalore stores" will filter on the string it
+        was given, produce SQL that runs perfectly and returns nothing, and the
+        answer will be confidently empty. Resolving here is the same principle
+        applied throughout the system: compute what the model would otherwise
+        have to infer.
+
+        Args:
+            question: The user's natural-language question.
+
+        Returns:
+            The user message.
+        """
+        block = render_for_prompt(resolve(question))
+        if not block:
+            return f"Question: {question}"
+        return f"Question: {question}\n\n{block}"
+
     async def execute(self, question: str) -> AnalysisPlan:
         """Plan how to answer one question.
 
@@ -170,7 +268,7 @@ class PlannerAgent(Agent[AnalysisPlan]):
                 :data:`MAX_PLANNING_ATTEMPTS`.
         """
         system = self.build_system_prompt()
-        user = f"Question: {question}"
+        user = self.build_user_prompt(question)
         last_error: str | None = None
 
         for attempt in range(1, MAX_PLANNING_ATTEMPTS + 1):
@@ -282,6 +380,12 @@ class PlannerAgent(Agent[AnalysisPlan]):
         """
         if result.intent is QueryIntent.UNSUPPORTED:
             return "Determined the question cannot be answered from this dataset."
+        if result.intent is QueryIntent.AMBIGUOUS:
+            options = len(result.clarification.options) if result.clarification else 0
+            return (
+                f"Found the question ambiguous and prepared {options} "
+                f"interpretations to choose between."
+            )
         diagnostics = " with diagnostics" if result.requires_diagnostics else ""
         return (
             f"Classified as {result.intent.value}{diagnostics} and planned "

@@ -46,6 +46,7 @@ from app.agents.contracts import (
     Insight,
     QueryIntent,
     QueryResult,
+    ResponseStatus,
     SubQuery,
     VerificationReport,
     VerificationStatus,
@@ -169,6 +170,158 @@ def _unsupported_explanation() -> str:
     )
 
 
+# What a question can ask about that this dataset simply does not hold, mapped
+# to the answerable questions nearest to it. The point is that a refusal should
+# leave the user somewhere to go: "we have no competitor data" is a dead end,
+# while offering the market-share-shaped questions the data *can* answer is
+# usually close enough to what they actually wanted.
+_OUT_OF_SCOPE_TOPICS: Final[tuple[tuple[tuple[str, ...], str, tuple[str, ...]], ...]] = (
+    (
+        (
+            "competitor", "competitors", "rival", "market share", "mcdonald",
+            "kfc", "domino", "burger king", "subway", "starbucks", "industry",
+            "versus the market", "peers",
+        ),
+        "any data about other companies, the wider market or industry benchmarks",
+        (
+            "Which stores are performing best and worst by revenue in the last "
+            "3 months?",
+            "How do our sales channels compare in the last 3 months?",
+        ),
+    ),
+    (
+        (
+            "weather", "rain", "temperature", "monsoon", "climate", "season "
+            "forecast",
+        ),
+        "any weather or external environment data",
+        (
+            "How does weekend trading compare with weekday trading?",
+            "How much do festive periods lift trading versus normal days?",
+        ),
+    ),
+    (
+        (
+            "staff", "employee", "headcount", "labour", "labor", "manager",
+            "shift", "hiring", "wages", "salary", "attrition",
+        ),
+        "any staffing, rota or payroll data",
+        (
+            "Which stores have consistently declining revenue, and why are "
+            "they declining?",
+            "What was our total revenue, order count and AOV in the last 3 "
+            "months?",
+        ),
+    ),
+    (
+        (
+            "marketing spend", "ad spend", "advertising", "campaign cost",
+            "cac", "acquisition cost", "budget", "roi on marketing",
+        ),
+        "any marketing, advertising or spend data beyond promotion discounts",
+        (
+            "How effective were our promotions in the last 3 months?",
+            "Which products generated the most revenue in the last 3 months?",
+        ),
+    ),
+    (
+        (
+            "rent", "overhead", "utilities", "electricity", "fixed cost",
+            "operating cost", "opex", "profit after", "net profit", "ebitda",
+        ),
+        (
+            "any cost data beyond estimated cost of goods sold, so true profit "
+            "cannot be computed"
+        ),
+        (
+            "Which product categories have the best estimated margin?",
+            "Which stores are performing best and worst by revenue in the last "
+            "3 months?",
+        ),
+    ),
+    (
+        (
+            "review", "rating", "nps", "complaint", "satisfaction", "feedback",
+            "sentiment", "opinion", "survey",
+        ),
+        "any customer opinion, review or satisfaction data",
+        (
+            "How do loyal, regular and occasional customers compare by "
+            "revenue?",
+            "Which stores are performing best and worst by revenue in the last "
+            "3 months?",
+        ),
+    ),
+    (
+        (
+            "forecast", "predict", "projection", "next year", "next month",
+            "next quarter", "will we", "expect", "future", "2027",
+        ),
+        (
+            f"any data after {settings.DATA_ASOF_DATE.isoformat()}, and it does "
+            f"not forecast"
+        ),
+        (
+            "How did revenue trend month by month over the last 12 months?",
+            "How much do festive periods lift trading versus normal days?",
+        ),
+    ),
+    (
+        (
+            "delivery time", "eta", "driver", "rider", "logistics",
+            "preparation time", "wait time", "queue",
+        ),
+        "any delivery timing, rider or fulfilment operations data",
+        (
+            "How do our sales channels compare in the last 3 months?",
+            "What share of revenue comes from delivery channels?",
+        ),
+    ),
+    (
+        (
+            "stock", "inventory", "wastage", "waste", "spoilage", "supplier",
+            "procurement", "shelf life",
+        ),
+        "any inventory, wastage or supplier data",
+        (
+            "Which products sell the most in the last 3 months?",
+            "Which product categories have the best estimated margin?",
+        ),
+    ),
+)
+
+# Offered when nothing more specific matches, so the reply is never a bare
+# refusal.
+_DEFAULT_SUGGESTIONS: Final[tuple[str, ...]] = (
+    "What was our total revenue, order count and AOV in the last 3 months?",
+    "Which stores are performing best and worst by revenue in the last 3 "
+    "months?",
+    "How do our sales channels compare in the last 3 months?",
+)
+
+
+def missing_data_for(question: str) -> tuple[str | None, list[str]]:
+    """Name what the dataset lacks for this question, and what it can answer.
+
+    Matching on the question's own words rather than on the planner's prose
+    means the refusal names the specific gap even when the model's reasoning
+    was vague, which is exactly when a user most needs to be told what is
+    missing rather than merely that something is.
+
+    Args:
+        question: The user's question.
+
+    Returns:
+        The specific thing that is absent (None when nothing specific matched)
+        and two or three adjacent questions that are answerable.
+    """
+    lowered = question.lower()
+    for keywords, missing, suggestions in _OUT_OF_SCOPE_TOPICS:
+        if any(keyword in lowered for keyword in keywords):
+            return missing, list(suggestions)
+    return None, list(_DEFAULT_SUGGESTIONS)
+
+
 class Orchestrator:
     """Runs planner, analyst, verifier and insight as one request."""
 
@@ -272,6 +425,30 @@ class Orchestrator:
         if plan.intent is QueryIntent.UNSUPPORTED:
             logger.info("question_unsupported", extra={"request_id": request_id})
             return self._unsupported_response(question, plan, steps, started)
+
+        # --- 2b. Ask rather than guess --------------------------------
+        if plan.intent is QueryIntent.AMBIGUOUS and plan.clarification is not None:
+            logger.info(
+                "question_ambiguous",
+                extra={
+                    "request_id": request_id,
+                    "clarification": plan.clarification.question,
+                },
+            )
+            for stage in ("sql_analyst", "verifier", "insight"):
+                steps.append(
+                    _skipped_step(
+                        stage,
+                        "Waiting for the user to say which interpretation "
+                        "they meant.",
+                    )
+                )
+            return AnalysisResponse.needs_clarification(
+                question=question,
+                plan=plan,
+                clarification=plan.clarification,
+                trace=self._build_trace(steps, started),
+            )
 
         # --- 3. Run the sub-queries -----------------------------------
         results, analyst_step = await self._run_analyst(
@@ -582,12 +759,26 @@ class Orchestrator:
                     stage, "The question cannot be answered from this dataset."
                 )
             )
+
+        missing, suggestions = missing_data_for(question)
+        headline = (
+            f"This needs {missing}, which QuickBite's sales data does not hold."
+            if missing
+            else "This question cannot be answered from QuickBite's sales data."
+        )
+        narrative = (
+            f"{plan.reasoning}\n\n{_unsupported_explanation()}\n\n"
+            f"No partial answer is offered, because building one on a dimension "
+            f"the data does not have would look like an answer while resting on "
+            f"nothing."
+        )
         insight = Insight(
-            headline=(
-                "This question cannot be answered from QuickBite's sales data."
-            ),
-            narrative=f"{plan.reasoning}\n\n{_unsupported_explanation()}",
-            key_findings=[],
+            headline=headline,
+            narrative=narrative,
+            # The nearest answerable questions, so a refusal still leaves the
+            # user somewhere to go. They are complete questions, submittable
+            # verbatim as the next request.
+            key_findings=suggestions,
             caveats=[],
             recommended_actions=[],
             confidence=0.0,
@@ -606,6 +797,8 @@ class Orchestrator:
             data_asof=settings.DATA_ASOF_DATE,
             from_cache=False,
             error=_unsupported_explanation(),
+            status=ResponseStatus.UNSUPPORTED,
+            suggested_questions=suggestions,
         )
 
     # ------------------------------------------------------------------

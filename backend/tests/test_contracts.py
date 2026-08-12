@@ -417,7 +417,14 @@ class TestEnums:
             "trend",
             "diagnostic",
             "unsupported",
+            "ambiguous",
         }
+
+    def test_terminal_intents_run_no_sql(self) -> None:
+        """Exactly the two intents that reply without querying are terminal."""
+        assert {
+            intent.value for intent in QueryIntent if intent.is_terminal
+        } == {"unsupported", "ambiguous"}
 
     def test_verification_statuses(self) -> None:
         """Every verdict the verifier may emit."""

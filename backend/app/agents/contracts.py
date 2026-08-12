@@ -23,7 +23,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.config import settings
 from app.semantic.schema import METRIC_DEFINITIONS
@@ -43,6 +43,32 @@ class QueryIntent(str, Enum):
     TREND = "trend"
     DIAGNOSTIC = "diagnostic"
     UNSUPPORTED = "unsupported"
+    AMBIGUOUS = "ambiguous"
+
+    @property
+    def is_terminal(self) -> bool:
+        """Whether this intent ends the run before any SQL is written.
+
+        Returns:
+            True for the two intents that produce a reply rather than an
+            analysis.
+        """
+        return self in {QueryIntent.UNSUPPORTED, QueryIntent.AMBIGUOUS}
+
+
+class ResponseStatus(str, Enum):
+    """What kind of reply the pipeline produced.
+
+    ``answered`` is not enough on its own: a clarification request and a
+    genuine failure are both "not answered" but mean completely different
+    things to a client, and rendering them the same way would tell a user their
+    question broke the system when it was merely underspecified.
+    """
+
+    ANSWERED = "answered"
+    CLARIFICATION_NEEDED = "clarification_needed"
+    UNSUPPORTED = "unsupported"
+    FAILED = "failed"
 
 
 class VerificationStatus(str, Enum):
@@ -147,6 +173,61 @@ class TimeWindow(BaseModel):
         if start is not None and value < start:
             raise ValueError(f"end_date {value} precedes start_date {start}")
         return value
+
+
+class Clarification(BaseModel):
+    """A single focused question back to the user, with ways to answer it.
+
+    Only produced when guessing would give a misleading answer. Most questions
+    have a sensible default and should simply be answered - defaulting is
+    cheaper for the user than a round trip, and a system that asks about
+    everything is more annoying than one that occasionally assumes.
+
+    The options are complete questions rather than fragments, so a client can
+    submit one verbatim as the next question and a user can see exactly what
+    they will get before clicking.
+    """
+
+    question: str = Field(
+        min_length=8,
+        description=(
+            "The single thing that must be settled before the question can be "
+            "answered, phrased as a direct question to the user."
+        ),
+    )
+    reason: str = Field(
+        description=(
+            "Why this cannot be defaulted: what would be wrong about the "
+            "answer if the wrong interpretation were assumed."
+        )
+    )
+    options: list[str] = Field(
+        min_length=2,
+        max_length=4,
+        description=(
+            "Two to four complete, self-contained questions the user can ask "
+            "instead. Each must be answerable on its own without further "
+            "context, because a client submits it verbatim."
+        ),
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "question": "Which sense of 'best' did you mean?",
+                "reason": (
+                    "The highest-selling product by units is a different "
+                    "product from the highest by revenue, so answering the "
+                    "wrong one would name the wrong item."
+                ),
+                "options": [
+                    "Which products sold the most units in the last 3 months?",
+                    "Which products generated the most revenue in the last 3 "
+                    "months?",
+                ],
+            }
+        }
+    )
 
 
 class SubQuery(BaseModel):
@@ -257,11 +338,21 @@ class AnalysisPlan(BaseModel):
         ),
     )
     sub_queries: list[SubQuery] = Field(
-        min_length=1,
+        default_factory=list,
         description=(
             "The individual queries to run, in order. At least one is "
-            "required. A diagnostic question typically needs several: one for "
-            "the headline number and others for the supporting evidence."
+            "required unless the intent is unsupported or ambiguous, neither "
+            "of which runs any SQL. A diagnostic question typically needs "
+            "several: one for the headline number and others for the "
+            "supporting evidence."
+        ),
+    )
+    clarification: Clarification | None = Field(
+        default=None,
+        description=(
+            "The question to put back to the user. Required when intent is "
+            "ambiguous and forbidden otherwise: a plan that both asks and "
+            "answers leaves the caller to decide which it meant."
         ),
     )
     requires_diagnostics: bool = Field(
@@ -401,6 +492,43 @@ class AnalysisPlan(BaseModel):
             )
         return value
 
+    @model_validator(mode="after")
+    def validate_intent_consistency(self) -> AnalysisPlan:
+        """Tie the intent to the fields it implies.
+
+        Three rules, each catching a plan that would otherwise fail confusingly
+        much later:
+
+        * An answerable intent needs at least one sub-query. Without this a
+          plan can be valid and yet produce no numbers at all.
+        * An ambiguous intent needs a clarification, or the caller has nothing
+          to put back to the user.
+        * Anything other than ambiguous must not carry a clarification. A plan
+          that both asks a question and answers one leaves the caller to guess
+          which was meant, and the safe guess is the wrong one.
+
+        Returns:
+            The validated plan.
+
+        Raises:
+            ValueError: If the intent and the fields disagree.
+        """
+        if not self.intent.is_terminal and not self.sub_queries:
+            raise ValueError(
+                f"intent '{self.intent.value}' requires at least one sub-query"
+            )
+        if self.intent is QueryIntent.AMBIGUOUS and self.clarification is None:
+            raise ValueError(
+                "intent 'ambiguous' requires a clarification with the question "
+                "to ask and the interpretations to offer"
+            )
+        if self.intent is not QueryIntent.AMBIGUOUS and self.clarification is not None:
+            raise ValueError(
+                f"intent '{self.intent.value}' must not carry a clarification; "
+                f"use intent 'ambiguous' to ask the user a question"
+            )
+        return self
+
 
 class QueryResult(BaseModel):
     """The outcome of running one sub-query.
@@ -448,6 +576,16 @@ class QueryResult(BaseModel):
         description=(
             "How many times this query was attempted, including the first. "
             "Greater than one means SQL was repaired after an error."
+        ),
+    )
+    degraded: bool = Field(
+        default=False,
+        description=(
+            "True when this SQL was assembled deterministically from the plan "
+            "because no model was reachable. The numbers are exact - it is "
+            "real SQL over the real database - but the query is a plain "
+            "aggregate rather than a tailored one, so it may answer a simpler "
+            "question than the one asked. Surfaced so the answer can say so."
         ),
     )
 
@@ -934,6 +1072,32 @@ class AnalysisResponse(BaseModel):
         default=None,
         description="Why the run failed, when answered is false.",
     )
+    status: ResponseStatus = Field(
+        default=ResponseStatus.ANSWERED,
+        description=(
+            "What kind of reply this is. 'answered' carries numbers; "
+            "'clarification_needed' carries a question back to the user; "
+            "'unsupported' means the data cannot answer it; 'failed' means "
+            "something broke. A client renders these four differently, and "
+            "collapsing them into the answered flag makes a question that was "
+            "merely underspecified look like an outage."
+        ),
+    )
+    clarification: Clarification | None = Field(
+        default=None,
+        description=(
+            "The question to put back to the user, present only when status "
+            "is 'clarification_needed'."
+        ),
+    )
+    suggested_questions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Complete, answerable questions to offer instead of this one. "
+            "Populated when the question was unsupported or ambiguous, so the "
+            "user always has somewhere to go next rather than a dead end."
+        ),
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -1080,4 +1244,50 @@ class AnalysisResponse(BaseModel):
             or AgentTrace(total_duration_ms=0.0, total_tokens=0, providers_used=[]),
             data_asof=settings.DATA_ASOF_DATE,
             error=error,
+            status=ResponseStatus.FAILED,
+        )
+
+    @classmethod
+    def needs_clarification(
+        cls,
+        question: str,
+        plan: AnalysisPlan,
+        clarification: Clarification,
+        trace: AgentTrace,
+    ) -> AnalysisResponse:
+        """Build a response that asks the user one question back.
+
+        This is not a failure and must not read like one. The insight carries
+        the clarifying question as its headline so a client that only renders
+        insights still shows something sensible, and the interpretations are
+        repeated in ``suggested_questions`` so they can be offered as one-click
+        follow-ups.
+
+        Args:
+            question: The user's original question.
+            plan: The plan that identified the ambiguity.
+            clarification: What to ask and what to offer.
+            trace: The trace of the run so far.
+
+        Returns:
+            A response with status ``clarification_needed``.
+        """
+        return cls(
+            question=question,
+            answered=False,
+            plan=plan,
+            trace=trace,
+            data_asof=settings.DATA_ASOF_DATE,
+            status=ResponseStatus.CLARIFICATION_NEEDED,
+            clarification=clarification,
+            suggested_questions=list(clarification.options),
+            insight=Insight(
+                headline=clarification.question,
+                narrative=clarification.reason,
+                key_findings=list(clarification.options),
+                caveats=[],
+                recommended_actions=[],
+                confidence=0.0,
+            ),
+            error=None,
         )

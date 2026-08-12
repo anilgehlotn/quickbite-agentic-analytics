@@ -32,6 +32,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from datetime import datetime, timezone
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, replace
 from typing import Any, Final, Sequence
@@ -831,8 +832,115 @@ def strip_code_fences(text: str) -> str:
     return "\n".join(lines).strip()
 
 
+#: Prompt used to check a provider is alive. Deliberately trivial: the probe
+#: measures reachability and credential validity, not capability, and a longer
+#: prompt would cost real money on every startup.
+PROBE_SYSTEM: Final[str] = "Reply with the single word OK."
+PROBE_USER: Final[str] = "ping"
+PROBE_MAX_TOKENS: Final[int] = 8
+
+
+@dataclass
+class ProviderHealth:
+    """The rolling health of one provider.
+
+    A provider is not simply up or down. It can be untried, known good, or
+    failing repeatedly enough that continuing to try it costs a user real
+    seconds for no chance of success. The breaker exists for that third state.
+
+    Attributes:
+        name: Provider name.
+        consecutive_failures: Failures since the last success.
+        opened_at: Monotonic time the breaker opened, or None when closed.
+        last_success: Monotonic time of the last successful call.
+        last_failure_reason: Why the most recent failure happened.
+        last_probe: Wall-clock ISO timestamp of the last startup/periodic
+            probe, or None when never probed.
+        probe_ok: Whether that probe succeeded.
+        probe_latency_ms: How long the probe took, when it ran.
+    """
+
+    name: str
+    consecutive_failures: int = 0
+    opened_at: float | None = None
+    last_success: float | None = None
+    last_failure_reason: str | None = None
+    last_probe: str | None = None
+    probe_ok: bool | None = None
+    probe_latency_ms: float | None = None
+
+    def is_open(self, now: float, cooldown: float) -> bool:
+        """Whether the breaker is currently holding this provider back.
+
+        Args:
+            now: Current monotonic time.
+            cooldown: Seconds the breaker stays open.
+
+        Returns:
+            True while the provider should be skipped.
+        """
+        if self.opened_at is None:
+            return False
+        if now - self.opened_at >= cooldown:
+            return False
+        return True
+
+    def cooldown_remaining(self, now: float, cooldown: float) -> float:
+        """Seconds until the provider is probed again.
+
+        Args:
+            now: Current monotonic time.
+            cooldown: Seconds the breaker stays open.
+
+        Returns:
+            Remaining seconds, or 0.0 when the breaker is closed.
+        """
+        if not self.is_open(now, cooldown):
+            return 0.0
+        assert self.opened_at is not None
+        return max(0.0, cooldown - (now - self.opened_at))
+
+    def record_success(self, now: float) -> None:
+        """Note a successful call, closing the breaker.
+
+        Args:
+            now: Current monotonic time.
+        """
+        self.consecutive_failures = 0
+        self.opened_at = None
+        self.last_success = now
+        self.last_failure_reason = None
+
+    def record_failure(self, now: float, reason: str, threshold: int) -> None:
+        """Note a failed call, opening the breaker at the threshold.
+
+        Args:
+            now: Current monotonic time.
+            reason: Why the call failed.
+            threshold: Consecutive failures that open the breaker.
+        """
+        self.consecutive_failures += 1
+        self.last_failure_reason = reason
+        if self.consecutive_failures >= threshold and self.opened_at is None:
+            self.opened_at = now
+
+
 class LLMClient:
-    """Calls LLM providers in preference order, failing over on error."""
+    """Calls LLM providers in preference order, failing over on error.
+
+    Three behaviours beyond plain failover, each addressing a way the naive
+    version wastes a user's time:
+
+    * **A circuit breaker.** After
+      :data:`Settings.CIRCUIT_BREAKER_THRESHOLD` consecutive failures a
+      provider is skipped for a cooldown, then tried again. Without this every
+      request pays the full timeout of a provider whose key expired months ago.
+    * **Provider exclusion.** Callers can ask for a completion that avoids
+      named providers. The JSON path uses it: a model that returned malformed
+      structure once is likely to do it again, so the retry goes elsewhere.
+    * **A liveness probe.** One tiny call per provider at startup reorders the
+      chain so the first provider tried is one that actually answered.
+    """
 
     def __init__(
         self,
@@ -868,6 +976,12 @@ class LLMClient:
             if provider.is_configured:
                 self.providers.append(provider)
 
+        self.health_by_provider: dict[str, ProviderHealth] = {
+            provider.name: ProviderHealth(name=provider.name)
+            for provider in self.providers
+        }
+        self._probed_at: float | None = None
+
     @property
     def provider_names(self) -> list[str]:
         """Names of the configured providers, in preference order.
@@ -877,20 +991,181 @@ class LLMClient:
         """
         return [provider.name for provider in self.providers]
 
+    @property
+    def healthy_provider_names(self) -> list[str]:
+        """Providers not currently held back by the breaker.
+
+        Returns:
+            The provider names that would be tried right now.
+        """
+        now = time.monotonic()
+        return [
+            provider.name
+            for provider in self.providers
+            if not self.health_by_provider[provider.name].is_open(
+                now, settings.CIRCUIT_BREAKER_COOLDOWN_SECONDS
+            )
+        ]
+
+    def _selection(
+        self, exclude: Sequence[str] = ()
+    ) -> tuple[list[LLMProvider], list[LLMProvider]]:
+        """Choose which providers to try, and in what order.
+
+        Args:
+            exclude: Provider names to skip entirely for this call.
+
+        Returns:
+            The providers to try, and the ones the breaker is holding back.
+            The held-back list is returned rather than discarded because it is
+            used as a last resort: refusing to try a provider is only better
+            than trying it while some other provider might still work.
+        """
+        now = time.monotonic()
+        excluded = {name.lower() for name in exclude}
+        available: list[LLMProvider] = []
+        blocked: list[LLMProvider] = []
+
+        for provider in self.providers:
+            if provider.name in excluded:
+                continue
+            health = self.health_by_provider[provider.name]
+            if health.is_open(now, settings.CIRCUIT_BREAKER_COOLDOWN_SECONDS):
+                blocked.append(provider)
+            else:
+                available.append(provider)
+
+        # A provider that answered a probe goes first. Ordering is otherwise
+        # the configured preference, and the sort is stable so it is preserved
+        # within each group.
+        available.sort(
+            key=lambda provider: self.health_by_provider[provider.name].probe_ok
+            is False
+        )
+        return available, blocked
+
+    async def probe_providers(self, force: bool = False) -> dict[str, Any]:
+        """Check every configured provider with one minimal call.
+
+        Run at startup and periodically. Failures are recorded but never
+        raised: a probe that cannot reach anything must not stop the
+        application starting, because the cache can still answer the canonical
+        questions with no provider at all.
+
+        Args:
+            force: Probe even if the interval has not elapsed.
+
+        Returns:
+            Provider name to its probe outcome.
+        """
+        now = time.monotonic()
+        if (
+            not force
+            and self._probed_at is not None
+            and now - self._probed_at < settings.PROVIDER_PROBE_INTERVAL_SECONDS
+        ):
+            return {
+                name: {"skipped": "probed recently"}
+                for name in self.provider_names
+            }
+
+        self._probed_at = now
+        results = await asyncio.gather(
+            *(self._probe_one(provider) for provider in self.providers),
+            return_exceptions=False,
+        )
+        outcome = dict(results)
+        logger.info(
+            "provider_probe_completed",
+            extra={
+                "healthy": [
+                    name for name, entry in outcome.items() if entry.get("ok")
+                ],
+                "unhealthy": [
+                    name for name, entry in outcome.items() if not entry.get("ok")
+                ],
+            },
+        )
+        return outcome
+
+    async def _probe_one(
+        self, provider: LLMProvider
+    ) -> tuple[str, dict[str, Any]]:
+        """Probe one provider, recording the result in its health.
+
+        Args:
+            provider: The provider to check.
+
+        Returns:
+            Its name and the probe outcome.
+        """
+        health = self.health_by_provider[provider.name]
+        started = time.perf_counter()
+        health.last_probe = datetime.now(timezone.utc).isoformat()
+        try:
+            await asyncio.wait_for(
+                provider.complete(
+                    system=PROBE_SYSTEM,
+                    user=PROBE_USER,
+                    max_tokens=PROBE_MAX_TOKENS,
+                ),
+                timeout=settings.PROVIDER_PROBE_TIMEOUT_SECONDS,
+            )
+        except (LLMError, asyncio.TimeoutError, Exception) as error:  # noqa: BLE001
+            latency_ms = (time.perf_counter() - started) * 1000
+            health.probe_ok = False
+            health.probe_latency_ms = round(latency_ms, 1)
+            # A failed probe opens the breaker immediately rather than
+            # counting towards the threshold: the probe *is* the evidence, and
+            # making a user's first request rediscover it defeats the point.
+            health.record_failure(
+                time.monotonic(),
+                f"probe failed: {error}",
+                threshold=1,
+            )
+            logger.warning(
+                "provider_probe_failed",
+                extra={"provider": provider.name, "reason": str(error)[:200]},
+            )
+            return provider.name, {"ok": False, "reason": str(error)[:200]}
+
+        latency_ms = (time.perf_counter() - started) * 1000
+        health.probe_ok = True
+        health.probe_latency_ms = round(latency_ms, 1)
+        health.record_success(time.monotonic())
+        return provider.name, {"ok": True, "latency_ms": round(latency_ms, 1)}
+
     async def complete(
         self,
         system: str,
         user: str,
         max_tokens: int | None = None,
         temperature: float | None = None,
+        exclude: Sequence[str] = (),
+        record_success: bool = True,
     ) -> LLMResponse:
         """Complete a prompt, failing over across providers.
+
+        Providers held back by the circuit breaker are skipped, but only while
+        another provider might still work. If the breaker has taken everything
+        out of rotation they are tried anyway: an open breaker is a prediction
+        that a call will fail, and a prediction is not a good enough reason to
+        return nothing when trying costs one timeout.
 
         Args:
             system: System prompt.
             user: User message.
             max_tokens: Maximum tokens to generate. Defaults to settings.
             temperature: Sampling temperature. Defaults to settings.
+            exclude: Provider names to skip. Used by the JSON path to retry
+                somewhere other than the provider that just produced garbage.
+            record_success: Whether a completed HTTP call counts as a success
+                for the breaker. The JSON path passes False and records the
+                outcome itself: a 200 carrying unparsable text is a transport
+                success but a failure of the operation, and recording it here
+                would reset the failure streak a moment before the parse error
+                increments it, so a provider returning garbage forever would
+                never trip the breaker.
 
         Returns:
             The first successful completion, with ``attempts`` listing every
@@ -906,11 +1181,27 @@ class LLMClient:
                 f"{', '.join(f'{n.upper()}_API_KEY' for n in PROVIDER_REGISTRY)}"
             )
 
+        available, blocked = self._selection(exclude)
+        if not available and blocked:
+            logger.warning(
+                "llm_breaker_bypassed",
+                extra={"providers": [p.name for p in blocked]},
+            )
+            available = blocked
+            blocked = []
+        if not available:
+            excluded = ", ".join(exclude) or "none"
+            raise LLMError(
+                f"no LLM provider is available (excluded: {excluded}; "
+                f"configured: {', '.join(self.provider_names)})"
+            )
+
         attempted: list[str] = []
         failures: list[ProviderFailure] = []
 
-        for provider in self.providers:
+        for provider in available:
             attempted.append(provider.name)
+            health = self.health_by_provider[provider.name]
             try:
                 response = await provider.complete(
                     system=system,
@@ -919,6 +1210,11 @@ class LLMClient:
                     temperature=temperature,
                 )
             except LLMError as error:
+                health.record_failure(
+                    time.monotonic(),
+                    str(error),
+                    settings.CIRCUIT_BREAKER_THRESHOLD,
+                )
                 failures.append(
                     ProviderFailure(
                         provider=provider.name,
@@ -933,18 +1229,30 @@ class LLMClient:
                         "provider": provider.name,
                         "model": provider.model,
                         "reason": str(error),
+                        "consecutive_failures": health.consecutive_failures,
+                        "breaker_open": health.is_open(
+                            time.monotonic(),
+                            settings.CIRCUIT_BREAKER_COOLDOWN_SECONDS,
+                        ),
                     },
                 )
                 continue
+            if record_success:
+                health.record_success(time.monotonic())
             return replace(response, attempts=list(attempted))
 
         summary = "; ".join(
             f"{failure.provider} ({failure.model}): {failure.reason}"
             for failure in failures
         )
+        skipped = [provider.name for provider in blocked]
         logger.error(
             "llm_all_providers_failed",
-            extra={"providers": attempted, "failures": summary},
+            extra={
+                "providers": attempted,
+                "skipped_by_breaker": skipped,
+                "failures": summary,
+            },
         )
         raise LLMError(
             f"all {len(failures)} LLM provider(s) failed: {summary}", failures
@@ -991,6 +1299,14 @@ class LLMClient:
         counts and provider for a trace use this; callers that only want the
         value use :meth:`complete_json`.
 
+        A response that will not parse fails over to a *different* provider
+        rather than being retried on the same one. Malformed structure is a
+        property of the model, not of the moment: at temperature zero the same
+        model given the same prompt will usually produce the same broken
+        output, so retrying it burns the user's time to arrive back where it
+        started. Every provider is given one chance before the call is
+        abandoned.
+
         Args:
             system: System prompt; the JSON instruction is appended to it.
             user: User message.
@@ -1001,29 +1317,63 @@ class LLMClient:
             The decoded JSON value and the completion that produced it.
 
         Raises:
-            LLMJSONError: If the response is not valid JSON. The error carries
-                the raw text so the caller can see what the model actually said.
-            LLMError: If every provider failed.
+            LLMJSONError: If no provider returned valid JSON. The error carries
+                the raw text of the last attempt so the caller can see what the
+                model actually said.
+            LLMError: If every provider failed to respond at all.
         """
-        response = await self.complete(
-            system=f"{system}\n\n{JSON_ONLY_INSTRUCTION}",
-            user=user,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
-        cleaned = strip_code_fences(response.text)
-        try:
-            return json.loads(cleaned), response
-        except json.JSONDecodeError as error:
-            logger.error(
-                "llm_json_parse_failed",
-                extra={"provider": response.provider, "error": str(error)},
+        tried: list[str] = []
+        last_error: LLMJSONError | None = None
+
+        # One pass per configured provider at most; the exclusion list grows
+        # by one each time so a provider is never asked twice.
+        for _ in range(max(1, len(self.providers))):
+            response = await self.complete(
+                system=f"{system}\n\n{JSON_ONLY_INSTRUCTION}",
+                user=user,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                exclude=tried,
+                record_success=False,
             )
-            raise LLMJSONError(
-                f"{response.provider} ({response.model}) did not return valid JSON: "
-                f"{error}. Raw response: {response.text!r}",
+            health = self.health_by_provider[response.provider]
+            cleaned = strip_code_fences(response.text)
+            try:
+                value = json.loads(cleaned)
+            except json.JSONDecodeError as error:
+                reason = str(error)
+            else:
+                health.record_success(time.monotonic())
+                return value, response
+
+            tried.append(response.provider)
+            last_error = LLMJSONError(
+                f"{response.provider} ({response.model}) did not return valid "
+                f"JSON: {reason}. Raw response: {response.text!r}",
                 raw_text=response.text,
-            ) from error
+            )
+            # Malformed JSON is a failure of this provider for this task, so it
+            # counts towards the breaker even though the HTTP call succeeded.
+            health.record_failure(
+                time.monotonic(),
+                f"returned unparsable JSON: {reason}",
+                settings.CIRCUIT_BREAKER_THRESHOLD,
+            )
+            logger.warning(
+                "llm_json_parse_failed",
+                extra={
+                    "provider": response.provider,
+                    "error": reason,
+                    "will_retry_elsewhere": len(tried) < len(self.providers),
+                },
+            )
+
+        assert last_error is not None  # loop body runs at least once
+        logger.error(
+            "llm_json_unparsable_everywhere",
+            extra={"providers": tried},
+        )
+        raise last_error
 
     def health(self) -> dict[str, Any]:
         """Report provider configuration without exposing credentials.
@@ -1036,17 +1386,50 @@ class LLMClient:
             Configured provider names, the preference order, the model ids and
             the retry settings.
         """
+        now = time.monotonic()
+        cooldown = settings.CIRCUIT_BREAKER_COOLDOWN_SECONDS
+        healthy = self.healthy_provider_names
         return {
             "providers_configured": self.provider_names,
+            "providers_healthy": healthy,
+            "providers_in_cooldown": [
+                name for name in self.provider_names if name not in healthy
+            ],
             "provider_order": list(settings.LLM_PROVIDER_ORDER),
-            "primary_provider": self.provider_names[0] if self.providers else None,
+            "primary_provider": healthy[0] if healthy else None,
             "any_configured": bool(self.providers),
+            "any_healthy": bool(healthy),
+            "provider_health": [
+                {
+                    "name": health.name,
+                    "healthy": not health.is_open(now, cooldown),
+                    "consecutive_failures": health.consecutive_failures,
+                    "cooldown_remaining_seconds": round(
+                        health.cooldown_remaining(now, cooldown), 1
+                    ),
+                    "last_probe": health.last_probe,
+                    "probe_ok": health.probe_ok,
+                    "probe_latency_ms": health.probe_latency_ms,
+                    # Truncated: a provider error can embed a whole request
+                    # body, and health output ends up in logs and screenshots.
+                    "last_failure": (
+                        health.last_failure_reason[:200]
+                        if health.last_failure_reason
+                        else None
+                    ),
+                }
+                for health in (
+                    self.health_by_provider[name] for name in self.provider_names
+                )
+            ],
             "models": {
                 name: getattr(settings, model_attr)
                 for name, (_, _, model_attr) in PROVIDER_REGISTRY.items()
             },
             "timeout_seconds": settings.LLM_TIMEOUT_SECONDS,
             "max_retries": settings.LLM_MAX_RETRIES,
+            "breaker_threshold": settings.CIRCUIT_BREAKER_THRESHOLD,
+            "breaker_cooldown_seconds": cooldown,
         }
 
 

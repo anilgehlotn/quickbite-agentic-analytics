@@ -163,11 +163,16 @@ function MetricCards({ result }: { result: QueryResult }): JSX.Element | null {
 export default function AnswerCard({
   response,
   onRetry,
+  onAsk,
+  busy = false,
 }: {
   response: AnalysisResponse;
   onRetry?: (question: string) => void;
+  onAsk?: (question: string) => void;
+  busy?: boolean;
 }): JSX.Element {
   const { insight, verification, query_results: results } = response;
+  const degraded = results.some((result) => result.degraded);
 
   const singleValue = results.find(
     (result) =>
@@ -196,6 +201,34 @@ export default function AnswerCard({
           <p className="mt-3 text-xs leading-relaxed text-faint">
             {response.error}
           </p>
+        )}
+
+        {/* A refusal that leaves the reader nowhere to go is only half an
+            answer. These are complete questions the data can answer, adjacent
+            to what was asked, submittable in one click. */}
+        {response.suggested_questions.length > 0 && onAsk !== undefined && (
+          <div className="mt-6">
+            <h4 className="label-caps">Try one of these instead</h4>
+            <ul className="mt-3 space-y-2">
+              {response.suggested_questions.map((question) => (
+                <li key={question}>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onAsk(question)}
+                    aria-label={`Ask: ${question}`}
+                    className="group flex w-full items-start gap-3 rounded border border-border bg-canvas px-4 py-3 text-left text-sm leading-relaxed text-muted transition-colors hover:border-accent-line hover:bg-accent-soft hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="mt-[0.4375rem] h-1 w-1 shrink-0 rounded-full bg-accent"
+                    />
+                    <span>{question}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -229,6 +262,15 @@ export default function AnswerCard({
           >
             <span aria-hidden="true" className="h-1 w-1 rounded-full bg-faint" />
             cached
+          </span>
+        )}
+        {degraded && (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full border border-caution-line bg-caution-soft px-2.5 py-1 text-label text-caution"
+            title="No language model was reachable, so the SQL was assembled directly from the plan. The figures are exact — they come from the same database — but the query is a plain aggregate rather than one tailored to the question."
+          >
+            <span aria-hidden="true" className="h-1 w-1 rounded-full bg-caution" />
+            simplified query
           </span>
         )}
       </div>

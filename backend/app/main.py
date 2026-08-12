@@ -21,6 +21,7 @@ or, honouring the configured port::
 
 from __future__ import annotations
 
+import asyncio
 import sqlite3
 import time
 from contextlib import asynccontextmanager
@@ -41,6 +42,7 @@ from app.api.routes import (
 )
 from app.config import settings
 from app.core.cache import get_cache
+from app.core.llm import get_llm_client
 from app.core.logging import configure_logging, get_logger
 from app.semantic.schema import METRIC_DEFINITIONS, TABLE_ALLOWLIST, get_compact_schema
 
@@ -115,8 +117,36 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "no LLM provider keys configured; only cached answers are available",
             extra={"cached_answers": cached},
         )
+
+    # Probe the providers in the background. Deliberately not awaited: a
+    # provider that is slow to answer must not delay the port opening, because
+    # the platform's health check has its own deadline and the cached answers
+    # are servable before any provider is known to work. The task is kept
+    # referenced so it cannot be garbage collected mid-flight.
+    probe_task: asyncio.Task[Any] | None = None
+    if settings.PROVIDER_PROBE_ON_STARTUP and settings.available_providers():
+        probe_task = asyncio.create_task(_probe_providers_quietly())
+
     yield
+
+    if probe_task is not None and not probe_task.done():
+        probe_task.cancel()
     logger.info("shutdown")
+
+
+async def _probe_providers_quietly() -> None:
+    """Run the startup provider probe, swallowing every failure.
+
+    A probe exists to make the *first user request* fast by discovering dead
+    providers in advance. It is an optimisation, so nothing it does may ever
+    prevent the application running.
+    """
+    try:
+        await get_llm_client().probe_providers(force=True)
+    except asyncio.CancelledError:
+        raise
+    except Exception as error:  # noqa: BLE001 - a probe must never break startup
+        logger.warning("provider_probe_error", extra={"error": str(error)[:200]})
 
 
 app = FastAPI(
@@ -363,6 +393,39 @@ def read_health() -> dict[str, Any]:
     if error:
         payload["database_error"] = error
     return payload
+
+
+@app.get("/api/providers")
+def read_provider_health() -> dict[str, Any]:
+    """Report which providers are configured, healthy or in cooldown.
+
+    Split out from ``/api/health`` because it is an operator's view rather than
+    a platform probe: the platform only needs to know whether to keep the
+    service in rotation, while a human debugging a slow answer needs to know
+    which provider is being skipped and for how long.
+
+    No credential material appears in the output, not even a masked prefix.
+
+    Returns:
+        The client's health view, including per-provider breaker state and the
+        last probe result.
+    """
+    return get_llm_client().health()
+
+
+@app.post("/api/providers/probe")
+async def probe_providers() -> dict[str, Any]:
+    """Re-probe every configured provider and return the outcome.
+
+    Exposed so a dead provider can be brought back without a redeploy: fix the
+    key, call this, and the breaker closes on the next success rather than
+    after the cooldown.
+
+    Returns:
+        Per-provider probe results and the resulting health view.
+    """
+    outcome = await get_llm_client().probe_providers(force=True)
+    return {"probe": outcome, "health": get_llm_client().health()}
 
 
 @app.get("/api/schema")
