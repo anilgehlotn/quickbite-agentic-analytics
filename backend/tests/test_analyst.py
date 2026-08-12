@@ -295,16 +295,41 @@ class TestExhaustedAttempts:
         assert llm.call_count == MAX_SQL_ATTEMPTS
 
     @pytest.mark.asyncio
-    async def test_llm_failure_degrades_to_an_error_result(
+    async def test_llm_failure_falls_back_to_deterministic_sql(
         self, plan: AnalysisPlan, sub_query: SubQuery
     ) -> None:
-        """Even a total provider outage produces a well-formed result."""
+        """A total provider outage still answers, from the plan alone.
+
+        The plan is structured data - metrics from a closed vocabulary, real
+        columns, an absolute window - so a plain aggregate can be assembled
+        with no model involved. The rows are real; only the query's
+        sophistication is reduced, which is what ``degraded`` records.
+        """
         agent = SQLAnalystAgent(llm=FakeLLM(LLMError("all providers failed")))
 
         result = await agent.execute(sub_query, plan)
 
+        assert result.error is None
+        assert result.degraded is True
+        assert result.row_count > 0
+
+    @pytest.mark.asyncio
+    async def test_bad_model_sql_is_not_replaced_by_the_fallback(
+        self, plan: AnalysisPlan, sub_query: SubQuery
+    ) -> None:
+        """The fallback is for an absent model, not an unhelpful one.
+
+        When the model is reachable but its SQL keeps being rejected, quietly
+        substituting a plain aggregate would answer a simpler question than the
+        one asked, and nothing downstream could detect the swap. A visibly
+        missing sub-query is a far better outcome.
+        """
+        agent = SQLAnalystAgent(llm=FakeLLM("DROP TABLE fact_orders"))
+
+        result = await agent.execute(sub_query, plan)
+
         assert result.error is not None
-        assert "LLM call failed" in result.error
+        assert result.degraded is False
 
 
 class TestRunMany:

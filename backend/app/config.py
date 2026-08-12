@@ -185,6 +185,37 @@ class Settings(BaseSettings):
     LLM_RETRY_BACKOFF_SECONDS: float = 0.5
 
     # ------------------------------------------------------------------
+    # Provider health
+    #
+    # A dead provider is worse than an absent one: every request pays its
+    # timeout before failing over. The breaker turns that recurring cost into
+    # a one-off, and the probe front-loads the discovery to startup.
+    # ------------------------------------------------------------------
+
+    #: Consecutive failures before a provider is taken out of the rotation.
+    #: Two rather than one, because a single failure is often the request's
+    #: fault rather than the provider's.
+    CIRCUIT_BREAKER_THRESHOLD: int = 2
+
+    #: How long a provider stays out before it is probed again. Long enough
+    #: that a rate-limited provider has recovered, short enough that a brief
+    #: outage does not sideline it for a whole session.
+    CIRCUIT_BREAKER_COOLDOWN_SECONDS: float = 120.0
+
+    #: Whether to probe each configured provider at startup and order the
+    #: chain by which ones actually answered.
+    PROVIDER_PROBE_ON_STARTUP: bool = True
+
+    #: Seconds allowed for one startup probe. Short: the probe is a liveness
+    #: check, and a provider that cannot answer a two-token prompt quickly is
+    #: not one to put first.
+    PROVIDER_PROBE_TIMEOUT_SECONDS: float = 12.0
+
+    #: Minimum seconds between re-probes, so periodic health checks cannot
+    #: turn into a spend.
+    PROVIDER_PROBE_INTERVAL_SECONDS: float = 900.0
+
+    # ------------------------------------------------------------------
     # Application settings
     # ------------------------------------------------------------------
 

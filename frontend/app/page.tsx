@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import AnswerCard from "@/components/AnswerCard";
+import ClarificationCard from "@/components/ClarificationCard";
 import Header from "@/components/Header";
 import ModeNotice from "@/components/ModeNotice";
 import QuestionInput from "@/components/QuestionInput";
@@ -315,10 +316,21 @@ export default function Home(): JSX.Element {
 
                   {turn.response !== null && (
                     <>
-                      <AnswerCard
-                        response={turn.response}
-                        onRetry={(question) => void ask(question)}
-                      />
+                      {turn.response.status === "clarification_needed" &&
+                      turn.response.clarification !== null ? (
+                        <ClarificationCard
+                          clarification={turn.response.clarification}
+                          onSelect={(question) => void ask(question)}
+                          busy={busy}
+                        />
+                      ) : (
+                        <AnswerCard
+                          response={turn.response}
+                          onRetry={(question) => void ask(question)}
+                          onAsk={(question) => void ask(question)}
+                          busy={busy}
+                        />
+                      )}
                       {/* On narrow screens the trace lives with its answer. */}
                       <details className="min-w-0 rounded-lg border border-border bg-surface lg:hidden">
                         <summary className="label-caps cursor-pointer px-5 py-3.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">

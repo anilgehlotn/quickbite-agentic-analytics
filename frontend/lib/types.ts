@@ -19,7 +19,22 @@ export type QueryIntent =
   | "comparison"
   | "trend"
   | "diagnostic"
-  | "unsupported";
+  | "unsupported"
+  | "ambiguous";
+
+/**
+ * What kind of reply the pipeline produced. Mirrors ResponseStatus.
+ *
+ * Four states rather than a boolean, because a clarification request and a
+ * genuine failure are both "not answered" but mean opposite things to a
+ * reader: one is the system working correctly on an underspecified question,
+ * the other is an outage.
+ */
+export type ResponseStatus =
+  | "answered"
+  | "clarification_needed"
+  | "unsupported"
+  | "failed";
 
 /** Outcome of verifying a set of query results. Mirrors VerificationStatus. */
 export type VerificationStatus = "passed" | "passed_with_warnings" | "failed";
@@ -82,6 +97,7 @@ export interface QueryResult {
   execution_ms: number;
   error: string | null;
   attempts: number;
+  degraded: boolean;
 }
 
 /** One assertion made about the query results. */
@@ -153,6 +169,16 @@ export interface AnalysisResponse {
   from_cache: boolean;
   request_id: string | null;
   error: string | null;
+  status: ResponseStatus;
+  clarification: Clarification | null;
+  suggested_questions: string[];
+}
+
+/** A question put back to the user, with ways to answer it. */
+export interface Clarification {
+  question: string;
+  reason: string;
+  options: string[];
 }
 
 /** One suggested question for the frontend's chips. */
@@ -174,6 +200,9 @@ export interface ProviderHealth {
   name: string;
   configured: boolean;
   model: string;
+  healthy: boolean;
+  cooldown_remaining_seconds: number;
+  last_probe: string | null;
 }
 
 /**
@@ -193,6 +222,7 @@ export interface HealthResponse {
   orchestrator_ready: boolean;
   providers: ProviderHealth[];
   providers_configured: string[];
+  providers_healthy: string[];
   cached_answers: number;
   degraded: boolean;
   mode: ServiceMode;

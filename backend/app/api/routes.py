@@ -186,6 +186,29 @@ class ProviderHealth(BaseModel):
             "faster than reading a failover error."
         )
     )
+    healthy: bool = Field(
+        default=True,
+        description=(
+            "Whether this provider is currently in the rotation. False means "
+            "the circuit breaker has taken it out after repeated failures and "
+            "it will be retried after the cooldown. An unconfigured provider "
+            "is reported healthy because it is never tried at all."
+        ),
+    )
+    cooldown_remaining_seconds: float = Field(
+        default=0.0,
+        description=(
+            "Seconds until a provider held back by the breaker is tried "
+            "again. Zero when it is in the rotation."
+        ),
+    )
+    last_probe: str | None = Field(
+        default=None,
+        description=(
+            "When this provider was last probed with a minimal call, or null "
+            "if it never has been."
+        ),
+    )
 
 
 class HealthResponse(BaseModel):
@@ -207,6 +230,14 @@ class HealthResponse(BaseModel):
     )
     providers_configured: list[str] = Field(
         description="Configured providers in failover order."
+    )
+    providers_healthy: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Configured providers currently in the rotation. Shorter than "
+            "providers_configured when the breaker has taken one out, which "
+            "is the difference between 'a key is set' and 'it works'."
+        ),
     )
     cached_answers: int = Field(
         description=(
@@ -516,6 +547,23 @@ def health() -> HealthResponse:
     ready = error is None and bool(configured)
     cached = len(get_cache())
 
+    # Per-provider breaker state, indexed for the response model below.
+    in_cooldown = set(provider_health.get("providers_in_cooldown", []))
+    cooldowns = {
+        entry["name"]: entry["cooldown_remaining_seconds"]
+        for entry in provider_health.get("provider_health", [])
+    }
+    probes = {
+        entry["name"]: entry["last_probe"]
+        for entry in provider_health.get("provider_health", [])
+    }
+
+    # A key that is set but whose provider the breaker has taken out cannot
+    # answer a new question, so it must not count towards readiness. Reporting
+    # "full" while every provider is in cooldown would be the one lie this
+    # endpoint exists to prevent.
+    ready = ready and bool(provider_health.get("providers_healthy"))
+
     # Three states, not two. "cache_only" is the state this deployment is most
     # likely to be found in - the database is fine, the evaluation questions
     # answer instantly from disk, and only new questions are unavailable - and
@@ -535,10 +583,20 @@ def health() -> HealthResponse:
         fact_orders_rows=row_count,
         orchestrator_ready=ready,
         providers=[
-            ProviderHealth(name=name, configured=name in configured, model=model)
+            ProviderHealth(
+                name=name,
+                configured=name in configured,
+                model=model,
+                healthy=name not in in_cooldown,
+                cooldown_remaining_seconds=cooldowns.get(name, 0.0),
+                last_probe=probes.get(name),
+            )
             for name, model in provider_health.get("models", {}).items()
         ],
         providers_configured=configured,
+        providers_healthy=[
+            name for name in configured if name not in in_cooldown
+        ],
         cached_answers=cached,
         data_asof=settings.DATA_ASOF_DATE.isoformat(),
         environment=settings.ENVIRONMENT,

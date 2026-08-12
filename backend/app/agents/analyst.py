@@ -43,6 +43,42 @@ logger = get_logger(__name__)
 # beyond that it tends to loop on the same mistake.
 MAX_SQL_ATTEMPTS: Final[int] = 2
 
+# --- Model-free fallback ---------------------------------------------------
+# Metric expressions the fallback can emit, copied in shape from the semantic
+# layer but restricted to fact_orders. Anything needing fact_order_lines or a
+# dimension join is deliberately absent: without a model there is nothing
+# checking the join, and a wrong join changes the grain silently.
+_FALLBACK_METRIC_SQL: Final[dict[str, str]] = {
+    "revenue": "SUM(net_before_tax)",
+    "revenue_with_tax": "SUM(net_revenue)",
+    "gross_revenue": "SUM(gross_bill_value)",
+    "discount": "SUM(discount_amount)",
+    "orders": "COUNT(DISTINCT order_id)",
+    "units": "SUM(total_qty)",
+    "aov": "SUM(net_before_tax) / COUNT(DISTINCT order_id)",
+    "units_per_order": "1.0 * SUM(total_qty) / COUNT(DISTINCT order_id)",
+}
+
+# Dimensions denormalised onto fact_orders, so grouping by them needs no join.
+_FALLBACK_DIMENSIONS: Final[frozenset[str]] = frozenset(
+    {
+        "channel",
+        "month_key",
+        "day_name",
+        "day_type",
+        "festive_period",
+        "is_weekend",
+        "is_festive",
+        "order_hour",
+        "store_id",
+        "order_date",
+    }
+)
+
+# Row cap for fallback SQL. Generous enough for a monthly series across every
+# store, small enough that a mistaken grouping cannot return the whole table.
+FALLBACK_ROW_LIMIT: Final[int] = 1000
+
 # Models wrap SQL in fences even when told not to.
 _SQL_FENCE = re.compile(r"^```(?:sql)?\s*\n?(.*?)\n?```$", re.DOTALL | re.IGNORECASE)
 
@@ -457,6 +493,125 @@ class SQLAnalystAgent(Agent[QueryResult]):
             cleaned = match.group(1).strip()
         return cleaned.rstrip(";").strip()
 
+    def build_fallback_sql(
+        self, sub_query: SubQuery, plan: AnalysisPlan
+    ) -> str | None:
+        """Build SQL from the plan alone, with no model involved.
+
+        The last line of defence for the case where the planner succeeded and
+        the provider then died: the plan is structured data - metrics from a
+        closed vocabulary, dimensions that are real columns, an absolute date
+        window - so a straightforward aggregate can be assembled from it
+        deterministically. It will not answer a diagnostic question well, but
+        "revenue by city for May to July" is most of what people ask, and
+        producing it beats reporting an outage.
+
+        Only ``fact_orders`` metrics and dimensions denormalised onto that
+        table are supported. Anything needing a join is refused rather than
+        guessed, because a wrong join silently changes the grain and the whole
+        point of this path is that nothing is checking the model's work.
+
+        Args:
+            sub_query: The piece of analysis to run.
+            plan: The plan it belongs to.
+
+        Returns:
+            Executable SQL, or None when the shape is outside what can be
+            built safely without a model.
+        """
+        metrics = [
+            metric for metric in plan.metrics if metric in _FALLBACK_METRIC_SQL
+        ]
+        if not metrics:
+            return None
+
+        dimensions = [
+            dimension
+            for dimension in (sub_query.dimensions or plan.dimensions)
+            if dimension in _FALLBACK_DIMENSIONS
+        ]
+        requested = list(sub_query.dimensions or plan.dimensions)
+        if len(dimensions) != len(requested):
+            # A dimension we cannot resolve without a join. Refuse rather than
+            # answer a different question from the one that was planned.
+            return None
+
+        selected = list(dimensions) + [
+            f"{_FALLBACK_METRIC_SQL[metric]} AS {metric}" for metric in metrics
+        ]
+        clauses = [
+            f"SELECT {', '.join(selected)}",
+            "FROM fact_orders",
+            f"WHERE order_date BETWEEN '{plan.time_window.start_date.isoformat()}' "
+            f"AND '{plan.time_window.end_date.isoformat()}'",
+        ]
+        if dimensions:
+            clauses.append(f"GROUP BY {', '.join(dimensions)}")
+            clauses.append(f"ORDER BY {metrics[0]} DESC")
+        clauses.append(f"LIMIT {FALLBACK_ROW_LIMIT}")
+        return "\n".join(clauses)
+
+    def _run_fallback(
+        self, sub_query: SubQuery, plan: AnalysisPlan, reason: str, started: float
+    ) -> QueryResult | None:
+        """Try the model-free SQL and return its result, or None.
+
+        Args:
+            sub_query: The piece of analysis to run.
+            plan: The plan it belongs to.
+            reason: Why the model path could not be used.
+            started: ``perf_counter`` reading when the sub-query began.
+
+        Returns:
+            The result when the fallback ran, otherwise None.
+        """
+        sql = self.build_fallback_sql(sub_query, plan)
+        if sql is None:
+            return None
+
+        validation = self.guard.validate(sql)
+        if not validation.valid:
+            # The fallback is generated by this file, so a guard rejection is a
+            # bug here rather than a model mistake. Log it loudly and give up
+            # on the fallback rather than trying to repair it.
+            logger.error(
+                "fallback_sql_rejected_by_guard",
+                extra={
+                    "sub_query_id": sub_query.id,
+                    "errors": validation.errors,
+                },
+            )
+            return None
+
+        try:
+            result = self.executor.execute(validation.sql, validate=False)
+        except QueryExecutionError as error:
+            logger.error(
+                "fallback_sql_failed",
+                extra={"sub_query_id": sub_query.id, "error": error.reason},
+            )
+            return None
+
+        logger.warning(
+            "sub_query_answered_by_fallback",
+            extra={
+                "sub_query_id": sub_query.id,
+                "reason": reason,
+                "row_count": result.row_count,
+            },
+        )
+        return QueryResult(
+            sub_query_id=sub_query.id,
+            sql=result.sql,
+            columns=result.columns,
+            rows=result.rows,
+            row_count=result.row_count,
+            execution_ms=(time.perf_counter() - started) * 1000,
+            error=None,
+            attempts=MAX_SQL_ATTEMPTS,
+            degraded=True,
+        )
+
     async def execute(
         self,
         sub_query: SubQuery,
@@ -486,6 +641,9 @@ class SQLAnalystAgent(Agent[QueryResult]):
         last_sql = ""
         last_error = "no attempt was made"
         started = time.perf_counter()
+        # Distinguishes "no model answered" from "the model answered badly".
+        # Only the first justifies the deterministic fallback; see below.
+        provider_unreachable = False
 
         for attempt in range(1, MAX_SQL_ATTEMPTS + 1):
             prompt = user
@@ -507,6 +665,7 @@ class SQLAnalystAgent(Agent[QueryResult]):
                 )
             except Exception as error:  # noqa: BLE001 - degrade, do not raise
                 last_error = f"LLM call failed: {error}"
+                provider_unreachable = True
                 break
 
             self.record_usage(
@@ -561,6 +720,18 @@ class SQLAnalystAgent(Agent[QueryResult]):
                 error=None,
                 attempts=attempt,
             )
+
+        # The deterministic fallback applies ONLY when no model could be
+        # reached. When the model answered but its SQL was rejected, the honest
+        # outcome is the error: the fallback can only build a plain aggregate,
+        # so substituting it for a query the model found hard would quietly
+        # answer a simpler question than the one asked - and the reader would
+        # have no way to tell. A missing sub-query is visible; a sub-query that
+        # silently changed meaning is not.
+        if provider_unreachable:
+            fallback = self._run_fallback(sub_query, plan, last_error, started)
+            if fallback is not None:
+                return fallback
 
         elapsed_ms = (time.perf_counter() - started) * 1000
         logger.error(
