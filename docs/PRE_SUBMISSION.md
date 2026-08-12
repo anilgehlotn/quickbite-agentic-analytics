@@ -18,9 +18,16 @@ result you have to guess at is not a check.
 - [ ] **`mode` is what you expect.** `"full"` if a provider key is funded,
       `"cache_only"` if not. `"offline"` means the database did not load and
       is a stop-the-line failure.
-- [ ] **`cached_answers` is 8.** Zero means the cache file did not ship — the
-      single most damaging deployment error, because everything else looks
-      fine until someone clicks a question.
+- [ ] **`cached_answers` is at least 8.** Zero means the cache file did not
+      ship — the single most damaging deployment error, because everything else
+      looks fine until someone clicks a question. The count is currently 21:
+      the eight canonical answers plus thirteen written by live testing during
+      Module 9. Extra entries are harmless (they make more questions instant
+      and provider-free), but see section 8 before shipping.
+- [ ] **Provider health.** `curl https://<render-url>/api/providers` shows
+      `providers_healthy` non-empty if any key is funded. A provider listed in
+      `providers_in_cooldown` with a non-zero `cooldown_remaining_seconds` is
+      the circuit breaker working, not a fault; `last_failure` says why.
 - [ ] **Frontend loads.** Open the Vercel URL. The header status pill reads
       `connected` within a few seconds, not `offline`.
 - [ ] **Time the first request.** If the backend was asleep this can take up
@@ -60,6 +67,9 @@ check the headline against `backend/tests/golden_answers.json`.
       recovery is a feature; hiding it would defeat the panel.
 - [ ] Ask one **free-form** question (if a provider is funded) and watch the
       stages advance during the wait.
+- [ ] A **degraded** sub-query, if one occurs, shows the `simplified query`
+      badge. That means no provider was reachable and the SQL was assembled
+      from the plan; the figures are exact, the query is a plain aggregate.
 
 ## 4. Mobile layout holds
 
@@ -72,7 +82,19 @@ check the headline against `backend/tests/golden_answers.json`.
 ## 5. Failure states are dignified
 
 - [ ] Ask a question the data cannot answer ("How do we compare with
-      McDonald's?"). Expect a clear statement of scope, not an error.
+      McDonald's?"). Expect `status: "unsupported"`, a statement naming what
+      specifically is missing, and two or three adjacent questions that *are*
+      answerable, offered as clickable follow-ups.
+- [ ] Ask an **ambiguous** question ("How are pizzas doing?"). Expect
+      `status: "clarification_needed"` rendered as a question back to you with
+      two to four interpretations, styled as a normal card and **not** as an
+      error. Click one and confirm it answers.
+- [ ] Ask a **year-on-year** question ("Compare this year to last year").
+      Expect a refusal explaining that the data covers a single twelve-month
+      window — not a silent comparison against an earlier part of the same year.
+- [ ] Ask about a **non-existent store** ("How is ST999 doing?"). Expect empty
+      results reported honestly. Known gap: it does not yet say the store does
+      not exist.
 - [ ] If `mode` is `cache_only`, confirm the banner above the input says so
       **before** anyone types, and the suggestion chips stay prominent.
 - [ ] Trigger the rate limit if convenient (11 uncached questions in a
@@ -109,6 +131,27 @@ check the headline against `backend/tests/golden_answers.json`.
       placeholders are the easiest thing in this list to forget.
 - [ ] The demo video plays from a private window.
 - [ ] `docs/DEPLOYMENT.md` matches what was actually deployed.
+- [ ] `docs/Agent_Architecture.pdf` regenerated from `docs/ARCHITECTURE.md`
+      (`python scripts/build_architecture_pdf.py`) and opens cleanly.
+- [ ] **Review the answer cache.** `data/answer_cache.json` holds 21 entries:
+      the eight canonical answers plus thirteen written by live testing during
+      Module 9. The extras are harmless — they make more questions instant and
+      provider-free — but they are cached output a reviewer can reach, so read
+      any you have not read. Two were removed for that reason:
+
+      * `how is store st999 performing` — cached an empty-result answer for a
+        store that does not exist. Asked live, the question now takes the
+        unsupported path and says so; the cache was short-circuiting that with
+        a worse answer.
+      * `how do loyal customers compare with occasional ones` — compared the
+        two segments without stating the anonymous-orders share, which the
+        business rules require whenever customer segments are discussed. The
+        surviving `how do loyal regular and occasional customers compare by
+        revenue` answers the same question and does state it.
+
+      Nothing else was touched, and no cache entry was regenerated. To remove
+      another key, edit the JSON and re-run `python scripts/check_offline.py`
+      plus `pytest tests/test_golden_e2e.py`; do not re-warm the file.
 
 ---
 
@@ -116,7 +159,7 @@ check the headline against `backend/tests/golden_answers.json`.
 
 ```bash
 cd backend
-python -m pytest tests/ -q            # expect 692 passed
+python -m pytest tests/ -q            # expect 809 passed
 python -m app.etl.quality_checks      # expect PASSED, 0 errors
 cd .. && python scripts/check_offline.py   # expect all 8 answered with no keys
 cd frontend && npm run lint && npm run build
