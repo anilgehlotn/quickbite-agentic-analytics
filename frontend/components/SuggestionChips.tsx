@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The eight evaluation questions, as one-click chips.
+ * The eight evaluation questions, in one of three presentations.
  *
  * These are the most important control on the page. A reviewer's first
  * interaction should be a single click that always succeeds, not a blank box
@@ -9,20 +9,41 @@
  * the answer cache, they return instantly and correctly even when no model
  * provider is reachable.
  *
- * The cached ones are marked, which is honest rather than decorative: it tells
- * the reader why the answer appeared immediately.
+ * The three presentations are purely visual and cost nothing in behaviour:
+ *
+ *   * `cards` — the empty state. Each question gets a real card with its label
+ *     as a heading and the full question beneath, because before the first
+ *     click the questions *are* the interface and a row of truncated chips
+ *     under-sells what the system can do.
+ *   * default — a wrapped row of chips, used once a conversation has started
+ *     but live analysis is unavailable, so the answerable questions stay
+ *     prominent rather than scrolling out of sight.
+ *   * `compact` — a single scrollable line, once the conversation is running
+ *     normally and the answers above deserve the space.
+ *
+ * Cached questions are marked, which is honest rather than decorative: it tells
+ * the reader why the answer appeared immediately. The marker is a word in the
+ * card presentation and a dot with a title where space forbids it, so the
+ * status is never carried by colour alone.
  */
 
 import type { QuestionSuggestion } from "@/lib/types";
 
+/** Focus ring shared by both presentations, offset against the page canvas. */
+const FOCUS_RING =
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
+  "focus-visible:ring-offset-2 focus-visible:ring-offset-canvas";
+
 /**
- * Clickable chips for the canonical questions.
+ * Clickable prompts for the canonical questions.
  *
  * @param props.questions - The suggestions from the API.
  * @param props.onSelect - Called with the full question text on click.
- * @param props.busy - Whether a request is in flight; disables the chips.
+ * @param props.busy - Whether a request is in flight; disables the controls.
  * @param props.loading - Whether the suggestions are still being fetched.
- * @returns The rendered chips, or a placeholder row while loading.
+ * @param props.compact - Render as a single scrollable line of chips.
+ * @param props.cards - Render as a grid of cards, for the empty state.
+ * @returns The rendered suggestions, or a placeholder while loading.
  */
 export default function SuggestionChips({
   questions,
@@ -30,20 +51,34 @@ export default function SuggestionChips({
   busy,
   loading,
   compact = false,
+  cards = false,
 }: {
   questions: QuestionSuggestion[];
   onSelect: (question: string) => void;
   busy: boolean;
   loading: boolean;
   compact?: boolean;
+  cards?: boolean;
 }): JSX.Element | null {
   if (loading) {
-    return (
+    return cards ? (
+      <div
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+        aria-hidden="true"
+      >
+        {Array.from({ length: 6 }).map((_, index) => (
+          <span
+            key={index}
+            className="h-[5.25rem] animate-pulse-soft rounded-lg border border-border bg-surface"
+          />
+        ))}
+      </div>
+    ) : (
       <div className="flex flex-wrap gap-2" aria-hidden="true">
         {Array.from({ length: 6 }).map((_, index) => (
           <span
             key={index}
-            className="h-8 w-40 animate-pulse-soft rounded-full border border-border bg-surface"
+            className="h-8 w-40 animate-pulse-soft rounded border border-border bg-surface"
           />
         ))}
       </div>
@@ -54,16 +89,47 @@ export default function SuggestionChips({
     return null;
   }
 
-  // Once the conversation has started the chips become a single scrollable
-  // line. They stay reachable, but they stop occupying a third of the sticky
-  // footer and crowding out the answer above it.
+  if (cards) {
+    return (
+      <div>
+        <h2 className="label-caps">Start with one of these</h2>
+        <ul className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {questions.map((suggestion) => (
+            <li key={suggestion.id}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onSelect(suggestion.question)}
+                aria-label={`Ask: ${suggestion.question}`}
+                className={`group flex h-full w-full flex-col items-start gap-1.5 rounded-lg border border-border bg-surface px-4 py-3.5 text-left transition-colors hover:border-accent-line hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-surface ${FOCUS_RING}`}
+              >
+                <span className="flex w-full items-center gap-2">
+                  <span className="text-sm font-semibold tracking-tight text-ink">
+                    {suggestion.label}
+                  </span>
+                  {suggestion.cached && (
+                    <span
+                      className="ml-auto shrink-0 text-micro uppercase tracking-[0.1em] text-positive"
+                      title="Answered from cache — instant, and available even if no model provider is reachable"
+                    >
+                      cached
+                    </span>
+                  )}
+                </span>
+                <span className="text-xs leading-relaxed text-muted">
+                  {suggestion.question}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
   return (
     <div>
-      {!compact && (
-        <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-faint">
-          Try one of these
-        </h2>
-      )}
+      {!compact && <h2 className="label-caps">Try one of these</h2>}
       <ul
         className={
           compact
@@ -79,7 +145,7 @@ export default function SuggestionChips({
               onClick={() => onSelect(suggestion.question)}
               title={suggestion.question}
               aria-label={`Ask: ${suggestion.question}`}
-              className="group inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3.5 py-2 text-sm text-muted transition-colors hover:border-accent/40 hover:bg-raised hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+              className={`group inline-flex items-center gap-2 rounded border border-border bg-surface px-3 py-1.5 text-xs text-muted transition-colors hover:border-accent-line hover:bg-accent-soft hover:text-accent disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS_RING}`}
             >
               {suggestion.cached && (
                 <span

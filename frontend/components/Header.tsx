@@ -29,14 +29,14 @@ export default function Header({
   // Saying "connected" while a banner two inches below explains that live
   // analysis is unavailable would be two truths that read as a contradiction.
   const tone = checking
-    ? { dot: "bg-caution animate-pulse-soft", label: "connecting" }
+    ? { dot: "bg-caution animate-pulse-soft", text: "text-muted", label: "connecting" }
     : health === null
-      ? { dot: "bg-negative", label: "offline" }
+      ? { dot: "bg-negative", text: "text-negative", label: "offline" }
       : health.mode === "full"
-        ? { dot: "bg-positive", label: "connected" }
+        ? { dot: "bg-positive", text: "text-muted", label: "connected" }
         : health.mode === "cache_only"
-          ? { dot: "bg-caution", label: "cached answers only" }
-          : { dot: "bg-negative", label: "unavailable" };
+          ? { dot: "bg-caution", text: "text-caution", label: "cached answers only" }
+          : { dot: "bg-negative", text: "text-negative", label: "unavailable" };
 
   const title =
     health === null
@@ -45,28 +45,32 @@ export default function Header({
         `configured · ${health.cached_answers} cached answers · v${health.version}`;
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-base/85 backdrop-blur">
-      <div className="mx-auto flex max-w-[92rem] items-center justify-between gap-4 px-5 py-3 sm:px-8">
-        <div className="flex items-baseline gap-3">
-          <span className="text-base font-semibold tracking-tight text-ink">
-            QuickBite<span className="text-accent">.</span>
+    <header className="sticky top-0 z-20 border-b border-border bg-canvas">
+      <div className="mx-auto flex max-w-[92rem] items-center justify-between gap-4 px-5 py-3.5 sm:px-8">
+        <div className="flex items-center gap-3">
+          <span className="text-[0.9375rem] font-semibold tracking-tight text-ink">
+            QuickBite
           </span>
-          <span className="hidden text-xs text-faint sm:inline">
+          <span aria-hidden="true" className="h-3.5 w-px bg-border" />
+          <span className="text-xs tracking-tight text-faint">
             Agentic analytics
           </span>
         </div>
 
         <div className="flex items-center gap-3">
           {health !== null && (
-            <span className="hidden font-mono text-[0.6875rem] tabular-nums text-faint sm:inline">
+            <span className="hidden text-label tabular-nums text-faint sm:inline">
               data as of {health.data_asof}
             </span>
           )}
           <span
             title={title}
-            className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-2.5 py-1 text-[0.6875rem] text-muted"
+            className={`inline-flex items-center gap-2 rounded-full border border-border bg-surface px-2.5 py-1 text-label ${tone.text}`}
           >
-            <span className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} />
+            <span
+              aria-hidden="true"
+              className={`h-1.5 w-1.5 rounded-full ${tone.dot}`}
+            />
             {tone.label}
           </span>
         </div>

@@ -41,17 +41,17 @@ const VERIFICATION_TONE: Record<
 > = {
   passed: {
     label: "Verified",
-    className: "border-positive/30 bg-positive/10 text-positive",
+    className: "border-positive-line bg-positive-soft text-positive",
     dot: "bg-positive",
   },
   passed_with_warnings: {
     label: "Verified with notes",
-    className: "border-caution/30 bg-caution/10 text-caution",
+    className: "border-caution-line bg-caution-soft text-caution",
     dot: "bg-caution",
   },
   failed: {
     label: "Unverified",
-    className: "border-negative/30 bg-negative/10 text-negative",
+    className: "border-negative-line bg-negative-soft text-negative",
     dot: "bg-negative",
   },
 };
@@ -77,33 +77,33 @@ function VerificationBadge({
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
-        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${tone.className}`}
+        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-label font-semibold transition-colors hover:border-border-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface ${tone.className}`}
       >
-        <span className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} />
+        <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} />
         {tone.label}
-        <span className="opacity-70">
+        <span className="font-normal tabular-nums text-muted">
           {report.checks.length - failed.length}/{report.checks.length} checks
         </span>
       </button>
 
       {open && (
-        <div className="mt-3 space-y-2 rounded-lg border border-border bg-surface p-4">
+        <div className="mt-3 rounded-lg border border-border bg-raised p-4">
           <p className="text-xs leading-relaxed text-muted">{report.summary}</p>
-          <ul className="space-y-1.5 pt-1">
+          <ul className="mt-3 space-y-2 border-t border-border pt-3">
             {report.checks.map((check) => (
-              <li key={check.name} className="flex gap-2 text-xs">
+              <li key={check.name} className="flex gap-2.5 text-xs">
                 <span
                   aria-hidden="true"
-                  className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
+                  className={`mt-[0.3125rem] h-1.5 w-1.5 shrink-0 rounded-full ${
                     check.passed
-                      ? "bg-positive/70"
+                      ? "bg-positive"
                       : check.severity === "error"
                         ? "bg-negative"
                         : "bg-caution"
                   }`}
                 />
-                <span className="flex-1">
-                  <span className="font-mono text-[0.6875rem] text-faint">
+                <span className="min-w-0 flex-1">
+                  <span className="font-mono text-micro text-faint">
                     {check.name}
                   </span>
                   <span className="ml-2 text-muted">{check.message}</span>
@@ -133,17 +133,15 @@ function MetricCards({ result }: { result: QueryResult }): JSX.Element | null {
   }
 
   return (
-    <dl className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <dl className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {numeric.slice(0, MAX_METRIC_CARDS).map((column) => (
         <div
           key={column}
-          className="rounded-lg border border-border bg-surface px-4 py-3.5"
+          className="rounded-lg border border-border bg-raised px-4 py-3.5"
         >
-          <dt className="text-[0.6875rem] uppercase tracking-[0.1em] text-faint">
-            {humaniseColumn(column)}
-          </dt>
+          <dt className="label-caps">{humaniseColumn(column)}</dt>
           <dd
-            className={`mt-1.5 font-mono tabular-nums text-ink ${
+            className={`mt-2 font-semibold tabular-nums tracking-tight text-ink ${
               isMoneyColumn(column) ? "text-xl" : "text-2xl"
             }`}
           >
@@ -178,13 +176,15 @@ export default function AnswerCard({
 
   if (!response.answered) {
     return (
-      <article className="rounded-xl border border-border bg-surface p-6">
+      <article className="rounded-lg border border-border bg-surface p-6">
         <div className="flex items-center gap-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-caution" />
-          <h3 className="text-sm font-medium text-ink">
-            {insight?.headline ?? "This question could not be answered."}
-          </h3>
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-caution" />
+          <span className="label-caps text-caution">Not answered</span>
         </div>
+
+        <h3 className="mt-3 text-balance text-base font-semibold leading-snug tracking-tight text-ink">
+          {insight?.headline ?? "This question could not be answered."}
+        </h3>
 
         <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-muted">
           {insight?.narrative ??
@@ -198,18 +198,18 @@ export default function AnswerCard({
           </p>
         )}
 
-        <div className="mt-5 flex flex-wrap items-center gap-3">
+        <div className="mt-6 flex flex-wrap items-center gap-3">
           {onRetry !== undefined && (
             <button
               type="button"
               onClick={() => onRetry(response.question)}
-              className="rounded-lg border border-accent/40 bg-accent-soft px-3.5 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent hover:text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="rounded border border-accent-line bg-accent-soft px-3.5 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent hover:text-accent-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
             >
               Try again
             </button>
           )}
           {response.request_id !== null && (
-            <span className="font-mono text-[0.6875rem] text-faint">
+            <span className="font-mono text-label text-faint">
               request {response.request_id}
             </span>
           )}
@@ -219,15 +219,15 @@ export default function AnswerCard({
   }
 
   return (
-    <article className="rounded-xl border border-border bg-surface p-6 sm:p-7">
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+    <article className="rounded-lg border border-border bg-surface p-6 sm:p-8">
+      <div className="mb-5 flex flex-wrap items-center gap-2">
         {verification !== null && <VerificationBadge report={verification} />}
         {response.from_cache && (
           <span
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-raised px-2.5 py-1 text-[0.6875rem] text-faint"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-raised px-2.5 py-1 text-label text-faint"
             title="This answer was computed earlier and stored. Cached answers return instantly and stay available even when no model provider is reachable."
           >
-            <span className="h-1 w-1 rounded-full bg-faint" />
+            <span aria-hidden="true" className="h-1 w-1 rounded-full bg-faint" />
             cached
           </span>
         )}
@@ -235,11 +235,11 @@ export default function AnswerCard({
 
       {insight !== null && (
         <>
-          <h3 className="text-balance text-lg font-semibold leading-snug tracking-tight text-ink sm:text-xl">
+          <h3 className="text-balance text-xl font-semibold leading-[1.3] tracking-tight text-ink sm:text-2xl">
             {insight.headline}
           </h3>
 
-          <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-muted">
+          <p className="mt-5 whitespace-pre-line text-[0.9375rem] leading-[1.7] text-muted">
             {insight.narrative}
           </p>
         </>
@@ -250,16 +250,14 @@ export default function AnswerCard({
       <ResultChart spec={response.chart} results={results} />
 
       {insight !== null && insight.key_findings.length > 0 && (
-        <section className="mt-6">
-          <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-faint">
-            Key findings
-          </h4>
-          <ul className="mt-3 space-y-2">
+        <section className="mt-8">
+          <h4 className="label-caps">Key findings</h4>
+          <ul className="mt-3.5 space-y-2.5">
             {insight.key_findings.map((finding, index) => (
               <li key={index} className="flex gap-3 text-sm leading-relaxed">
                 <span
                   aria-hidden="true"
-                  className="mt-2 h-1 w-1 shrink-0 rounded-full bg-accent"
+                  className="mt-[0.5625rem] h-1 w-1 shrink-0 rounded-full bg-accent"
                 />
                 <span className="text-muted">{finding}</span>
               </li>
@@ -269,15 +267,13 @@ export default function AnswerCard({
       )}
 
       {insight !== null && insight.recommended_actions.length > 0 && (
-        <section className="mt-6">
-          <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-faint">
-            Recommended actions
-          </h4>
-          <ul className="mt-3 space-y-2">
+        <section className="mt-8">
+          <h4 className="label-caps">Recommended actions</h4>
+          <ul className="mt-3.5 space-y-2">
             {insight.recommended_actions.map((action, index) => (
               <li
                 key={index}
-                className="rounded-lg border border-border bg-raised px-4 py-3 text-sm leading-relaxed text-muted"
+                className="border-l-2 border-accent-line bg-raised px-4 py-3 text-sm leading-relaxed text-muted"
               >
                 {action}
               </li>
@@ -293,11 +289,9 @@ export default function AnswerCard({
         ))}
 
       {insight !== null && insight.caveats.length > 0 && (
-        <section className="mt-6 rounded-lg border border-border/70 bg-base/40 px-4 py-3.5">
-          <h4 className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-faint">
-            Worth knowing
-          </h4>
-          <ul className="mt-2 space-y-1.5">
+        <section className="mt-8 rounded-lg bg-raised px-4 py-4">
+          <h4 className="label-caps">Worth knowing</h4>
+          <ul className="mt-2.5 space-y-1.5">
             {insight.caveats.map((caveat, index) => (
               <li key={index} className="text-xs leading-relaxed text-faint">
                 {caveat}

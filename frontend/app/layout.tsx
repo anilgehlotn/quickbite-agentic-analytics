@@ -27,7 +27,7 @@ export default function RootLayout({
 }): JSX.Element {
   return (
     <html lang="en" className={inter.variable}>
-      <body className="min-h-screen bg-base font-sans text-ink antialiased">
+      <body className="min-h-screen bg-canvas font-sans text-ink antialiased">
         {children}
       </body>
     </html>

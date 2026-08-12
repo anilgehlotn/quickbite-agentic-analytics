@@ -85,8 +85,8 @@ export default function QuestionInput({
         event.preventDefault();
         submit();
       }}
-      className={`rounded-xl border bg-surface transition-colors ${
-        focused ? "border-accent/50" : "border-border"
+      className={`rounded-lg border bg-surface shadow-input transition-colors ${
+        focused ? "border-accent" : "border-border-strong"
       }`}
     >
       <label htmlFor="question" className="sr-only">
@@ -106,17 +106,20 @@ export default function QuestionInput({
           onBlur={() => setFocused(false)}
           placeholder="Ask about revenue, stores, channels, products, seasonality…"
           aria-describedby="question-hint"
-          className="min-h-[2.5rem] flex-1 resize-none bg-transparent px-1 py-2 text-sm leading-relaxed text-ink placeholder:text-faint focus:outline-none disabled:opacity-60"
+          className="min-h-[2.5rem] flex-1 resize-none bg-transparent px-1 py-2 text-[0.9375rem] leading-relaxed text-ink placeholder:text-faint focus:outline-none disabled:opacity-60"
         />
         <button
           type="submit"
           disabled={!canSubmit}
           aria-label={busy ? "Analysing" : "Send question"}
-          className="mb-0.5 inline-flex h-9 shrink-0 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-base transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:opacity-40"
+          // Disabled keeps the accent at low opacity rather than turning grey:
+          // the button is the page's only primary action, and a grey rest
+          // state means the accent never appears until someone has typed.
+          className="mb-0.5 inline-flex h-9 shrink-0 items-center gap-2 rounded bg-accent px-4 text-sm font-medium text-accent-fg transition-colors hover:bg-accent-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:opacity-35"
         >
           {busy ? (
             <>
-              <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-base" />
+              <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-accent-fg" />
               Analysing
             </>
           ) : (
@@ -127,7 +130,7 @@ export default function QuestionInput({
 
       <div
         id="question-hint"
-        className="flex items-center justify-between gap-4 border-t border-border/60 px-4 py-2 text-[0.6875rem] text-faint"
+        className="flex items-center justify-between gap-4 border-t border-border px-4 py-2 text-label text-faint"
       >
         <span>
           {tooShort
@@ -136,7 +139,7 @@ export default function QuestionInput({
         </span>
         {showCounter && (
           <span
-            className={`font-mono tabular-nums ${
+            className={`tabular-nums ${
               remaining <= 0 ? "text-negative" : "text-caution"
             }`}
             aria-live="polite"
