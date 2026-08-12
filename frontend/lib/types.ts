@@ -85,6 +85,13 @@ export interface AnalysisPlan {
   requires_diagnostics: boolean;
   reasoning: string;
   confidence: number;
+  /**
+   * The question to put back to the user, present only when intent is
+   * "ambiguous". The same object is lifted onto the response itself, which is
+   * where a client should read it from; it is mirrored here because the plan
+   * is rendered verbatim in the trace panel.
+   */
+  clarification: Clarification | null;
 }
 
 /** The outcome of running one sub-query, including the exact SQL. */
