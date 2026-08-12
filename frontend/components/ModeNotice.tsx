@@ -38,9 +38,9 @@ export default function ModeNotice({
     return (
       <div
         role="status"
-        className="mb-3 rounded-lg border border-negative/30 bg-negative/5 px-4 py-3"
+        className="mb-3 rounded-lg border border-negative-line bg-negative-soft px-4 py-3"
       >
-        <p className="text-xs font-medium text-negative">
+        <p className="text-xs font-semibold text-negative">
           The analytics service is not reachable.
         </p>
         <p className="mt-1.5 text-xs leading-relaxed text-muted">
@@ -55,9 +55,9 @@ export default function ModeNotice({
   return (
     <div
       role="status"
-      className="mb-3 rounded-lg border border-caution/30 bg-caution/5 px-4 py-3"
+      className="mb-3 rounded-lg border border-caution-line bg-caution-soft px-4 py-3"
     >
-      <p className="text-xs font-medium text-caution">
+      <p className="text-xs font-semibold text-caution">
         Live analysis is unavailable right now — {cachedAnswers} prepared
         analyses are ready.
       </p>

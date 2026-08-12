@@ -129,7 +129,7 @@ function CopyButton({
       type="button"
       onClick={() => void copy()}
       aria-label={label}
-      className="rounded border border-border px-2 py-0.5 text-[0.625rem] text-faint transition-colors hover:border-accent/40 hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      className="rounded-sm border border-border px-1.5 py-0.5 text-micro text-faint transition-colors hover:border-accent-line hover:bg-accent-soft hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
     >
       {copied ? "copied" : "copy"}
     </button>
@@ -173,7 +173,9 @@ function Step({
   const style = STATUS_STYLE[status];
 
   return (
-    <li className="relative flex gap-3 pb-4 last:pb-0">
+    <li className="relative flex gap-3 pb-5 last:pb-0">
+      {/* The hairline between dots is what makes the steps read as a pipeline
+          rather than an unordered list. */}
       {!last && (
         <span
           aria-hidden="true"
@@ -182,15 +184,15 @@ function Step({
       )}
       <span
         aria-hidden="true"
-        className={`relative mt-1.5 h-[7px] w-[7px] shrink-0 rounded-full ${style.dot}`}
+        className={`relative mt-[0.3125rem] h-[7px] w-[7px] shrink-0 rounded-full ${style.dot}`}
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-xs font-medium text-ink">
+          <span className="text-xs font-semibold tracking-tight text-ink">
             {stepLabel(name)}
           </span>
           <span
-            className={`shrink-0 font-mono text-[0.625rem] tabular-nums ${style.text}`}
+            className={`shrink-0 text-label tabular-nums ${style.text}`}
           >
             {durationMs !== undefined
               ? formatDuration(durationMs)
@@ -198,18 +200,16 @@ function Step({
           </span>
         </div>
 
-        <p className="mt-1 text-[0.6875rem] leading-relaxed text-muted">
-          {summary}
-        </p>
+        <p className="mt-1 text-label leading-relaxed text-muted">{summary}</p>
 
         {error !== undefined && error !== null && (
-          <p className="mt-1 text-[0.6875rem] leading-relaxed text-negative">
+          <p className="mt-1 text-label leading-relaxed text-negative">
             {error}
           </p>
         )}
 
         {(provider ?? null) !== null && (
-          <p className="mt-1 font-mono text-[0.625rem] text-faint">
+          <p className="mt-1.5 font-mono text-micro tabular-nums text-faint">
             {provider}
             {tokens !== undefined && tokens !== null
               ? ` · ${formatTokens(tokens)} tokens`
@@ -229,13 +229,13 @@ function Step({
  */
 function SqlBlock({ result }: { result: QueryResult }): JSX.Element {
   return (
-    <div className="min-w-0 overflow-hidden rounded-lg border border-border bg-base/50">
+    <div className="min-w-0 overflow-hidden rounded border border-border bg-raised">
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-1.5">
-        <span className="truncate font-mono text-[0.625rem] text-muted">
+        <span className="truncate font-mono text-micro text-muted">
           {result.sub_query_id}
         </span>
         <div className="flex shrink-0 items-center gap-2">
-          <span className="font-mono text-[0.625rem] tabular-nums text-faint">
+          <span className="font-mono text-micro tabular-nums text-faint">
             {result.error !== null
               ? "failed"
               : `${result.row_count.toLocaleString("en-IN")} rows · ${formatDuration(
@@ -244,7 +244,7 @@ function SqlBlock({ result }: { result: QueryResult }): JSX.Element {
           </span>
           {result.attempts > 1 && (
             <span
-              className="rounded border border-caution/30 px-1.5 py-px text-[0.625rem] text-caution"
+              className="rounded-sm border border-caution-line bg-caution-soft px-1.5 py-px text-micro text-caution"
               title="The first attempt failed and was repaired using the database's own error message"
             >
               retry {result.attempts}
@@ -259,11 +259,11 @@ function SqlBlock({ result }: { result: QueryResult }): JSX.Element {
         </div>
       </div>
       {result.error !== null ? (
-        <p className="px-3 py-2 text-[0.6875rem] leading-relaxed text-negative">
+        <p className="bg-negative-soft px-3 py-2 text-label leading-relaxed text-negative">
           {result.error}
         </p>
       ) : (
-        <pre className="max-h-56 overflow-auto px-3 py-2 font-mono text-[0.6875rem] leading-relaxed text-muted">
+        <pre className="max-h-56 overflow-auto px-3 py-2.5 font-mono text-label leading-[1.65] text-muted">
           <code>{result.sql}</code>
         </pre>
       )}
@@ -303,22 +303,23 @@ export default function TracePanel({
       className={
         hideHeader
           ? "min-w-0"
-          : "min-w-0 rounded-xl border border-border bg-surface"
+          : "min-w-0 rounded-lg border border-border bg-surface"
       }
     >
       {!hideHeader && (
         <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-3.5">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-faint">
-            Agent trace
-          </h2>
+          <h2 className="label-caps">Agent trace</h2>
           {busy ? (
-            <span className="inline-flex items-center gap-2 text-[0.6875rem] text-accent">
-              <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-accent" />
+            <span className="inline-flex items-center gap-2 text-label text-accent">
+              <span
+                aria-hidden="true"
+                className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-accent"
+              />
               running
             </span>
           ) : (
             response !== null && (
-              <span className="font-mono text-[0.625rem] tabular-nums text-faint">
+              <span className="text-label tabular-nums text-faint">
                 {formatDuration(response.trace.total_duration_ms)} ·{" "}
                 {formatTokens(response.trace.total_tokens)} tokens
               </span>
@@ -327,7 +328,7 @@ export default function TracePanel({
         </header>
       )}
 
-      <div className={hideHeader ? "" : "px-5 py-4"}>
+      <div className={hideHeader ? "" : "px-5 py-5"}>
         {busy ? (
           <>
             <ol className="mt-1">
@@ -356,14 +357,14 @@ export default function TracePanel({
                 );
               })}
             </ol>
-            <p className="mt-1 text-[0.625rem] leading-relaxed text-faint">
+            <p className="mt-2 border-t border-border pt-3 text-micro leading-relaxed text-faint">
               Stage order is fixed; the highlight is indicative until the run
               finishes. Measured durations and token counts appear below when it
               does.
             </p>
           </>
         ) : response === null ? (
-          <div className="py-6">
+          <div className="py-2">
             <p className="text-xs leading-relaxed text-muted">
               Four agents answer every question: a planner interprets it, a SQL
               analyst writes and runs the queries, a verifier checks the numbers
@@ -373,7 +374,7 @@ export default function TracePanel({
               Their steps, the exact SQL executed, the duration and the token
               cost all appear here once you ask something.
             </p>
-            <ol className="mt-5">
+            <ol className="mt-6">
               {STAGES.map((stage, index) => (
                 <Step
                   key={stage.key}
@@ -404,7 +405,7 @@ export default function TracePanel({
             </ol>
 
             {plan !== null && (
-              <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border border-border bg-base/40 px-4 py-3 text-[0.6875rem]">
+              <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-2 rounded border border-border bg-raised px-4 py-3.5 text-label">
                 <dt className="text-faint">Intent</dt>
                 <dd className="text-right font-mono text-muted">
                   {plan.intent}
@@ -442,17 +443,15 @@ export default function TracePanel({
             )}
 
             {response.query_results.length > 0 && (
-              <div className="mt-4">
+              <div className="mt-6 border-t border-border pt-4">
                 <button
                   type="button"
                   onClick={() => setShowSql((current) => !current)}
                   aria-expanded={showSql}
-                  className="flex w-full items-center justify-between gap-3 text-left text-xs text-muted transition-colors hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  className="group flex w-full items-center justify-between gap-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
-                  <span className="font-semibold uppercase tracking-[0.14em] text-faint">
-                    Executed SQL
-                  </span>
-                  <span className="text-faint">
+                  <span className="label-caps">Executed SQL</span>
+                  <span className="text-label text-faint group-hover:text-accent">
                     {showSql ? "Hide" : "Show"}
                   </span>
                 </button>

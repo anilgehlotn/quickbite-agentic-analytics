@@ -39,21 +39,28 @@ const MAX_CATEGORIES = 24;
 /** Maximum series in a grouped chart. Beyond this the legend dominates. */
 const MAX_SERIES = 8;
 
-/** Palette for series, amber first and muted neutrals after it. */
+/**
+ * Palette for series: the accent first, muted neutrals after it.
+ *
+ * These are the same CSS variables the rest of the interface uses. SVG resolves
+ * `var()` in `fill` and `stroke`, so the chart cannot drift out of step with
+ * the page — there is one palette, declared once, in app/globals.css.
+ */
 const SERIES_COLOURS = [
-  "#e5893f",
-  "#8c9a8e",
-  "#a4784f",
-  "#7f8fa1",
-  "#c2a15f",
-  "#9a7f8f",
-  "#6f8a86",
-  "#b58b6a",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
+  "var(--chart-7)",
+  "var(--chart-8)",
 ];
 
-/** Axis and grid colours, matching the established palette. */
-const AXIS_COLOUR = "#6f6862";
-const GRID_COLOUR = "#2b2723";
+/** Axis, grid and hover colours, from the same palette. */
+const AXIS_COLOUR = "var(--color-faint)";
+const GRID_COLOUR = "var(--color-border)";
+const CURSOR_COLOUR = "var(--color-accent-soft)";
 
 /**
  * A row shaped for Recharts: one x value plus one numeric field per series.
@@ -121,20 +128,21 @@ function ChartTooltip({
     return null;
   }
   return (
-    <div className="rounded-lg border border-border bg-raised px-3 py-2 shadow-lg">
-      <p className="text-xs font-medium text-ink">{String(label ?? "")}</p>
-      <ul className="mt-1 space-y-0.5">
+    <div className="rounded border border-border bg-surface px-3 py-2 shadow-pop">
+      <p className="text-label font-semibold text-ink">{String(label ?? "")}</p>
+      <ul className="mt-1.5 space-y-1">
         {payload.map((entry, index) => (
           <li
             key={`${entry.name ?? index}`}
-            className="flex items-center gap-2 text-xs text-muted"
+            className="flex items-center gap-2 text-label text-muted"
           >
             <span
+              aria-hidden="true"
               className="h-1.5 w-1.5 shrink-0 rounded-full"
               style={{ backgroundColor: entry.color ?? SERIES_COLOURS[0] }}
             />
             <span>{humaniseColumn(entry.name ?? "")}</span>
-            <span className="ml-auto font-mono tabular-nums text-ink">
+            <span className="ml-auto pl-4 font-medium tabular-nums text-ink">
               {typeof entry.value === "number"
                 ? formatCell(entry.name ?? "", entry.value)
                 : String(entry.value ?? "")}
@@ -318,7 +326,7 @@ export default function ResultChart({
 
   const money = yFields.some((field) => isMoneyColumn(field));
   const axisProps = {
-    stroke: AXIS_COLOUR,
+    stroke: GRID_COLOUR,
     tick: { fill: AXIS_COLOUR, fontSize: 11 },
     tickLine: false,
   } as const;
@@ -326,10 +334,8 @@ export default function ResultChart({
   const isLine = spec.chart_type === "line";
 
   return (
-    <figure className="mt-6">
-      <figcaption className="mb-3 text-sm font-medium text-ink">
-        {spec.title}
-      </figcaption>
+    <figure className="mt-8">
+      <figcaption className="label-caps mb-4">{spec.title}</figcaption>
       <div style={{ width: "100%", height: CHART_HEIGHT }}>
         <ResponsiveContainer width="100%" height="100%">
           {isLine ? (
@@ -351,7 +357,7 @@ export default function ResultChart({
               {series.length > 1 && (
                 <Legend
                   formatter={(value: string) => (
-                    <span className="text-xs text-muted">
+                    <span className="text-label text-muted">
                       {grouped ? value : humaniseColumn(value)}
                     </span>
                   )}
@@ -363,8 +369,8 @@ export default function ResultChart({
                   type="monotone"
                   dataKey={name}
                   stroke={SERIES_COLOURS[index % SERIES_COLOURS.length]}
-                  strokeWidth={2}
-                  dot={{ r: 2.5 }}
+                  strokeWidth={1.75}
+                  dot={{ r: 2 }}
                   activeDot={{ r: 4 }}
                   isAnimationActive={false}
                 />
@@ -389,14 +395,11 @@ export default function ResultChart({
                 width={64}
                 tickFormatter={(value: number) => formatTick(value, money)}
               />
-              <Tooltip
-                content={<ChartTooltip />}
-                cursor={{ fill: "rgba(229, 137, 63, 0.06)" }}
-              />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: CURSOR_COLOUR }} />
               {series.length > 1 && (
                 <Legend
                   formatter={(value: string) => (
-                    <span className="text-xs text-muted">
+                    <span className="text-label text-muted">
                       {grouped ? value : humaniseColumn(value)}
                     </span>
                   )}
@@ -407,7 +410,7 @@ export default function ResultChart({
                   key={name}
                   dataKey={name}
                   fill={SERIES_COLOURS[index % SERIES_COLOURS.length]}
-                  radius={[3, 3, 0, 0]}
+                  radius={[2, 2, 0, 0]}
                   isAnimationActive={false}
                 />
               ))}
