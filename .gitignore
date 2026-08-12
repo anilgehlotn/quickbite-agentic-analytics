@@ -35,6 +35,14 @@ Thumbs.db
 # ETL step is committed to the repository so the application deploys with zero
 # infrastructure - no database server to provision, no build step on the host.
 # Do not add data/*.db or data/quickbite.db here.
+#
+# data/answer_cache.json is committed for the same reason and a stronger one:
+# it holds the warmed answers to the eight evaluation questions, so the
+# deployment can answer them correctly after every API key has expired. Ignoring
+# it would mean a reviewer opening the URL months from now gets "live analysis
+# unavailable" to exactly the questions the system was built to answer.
+# Do not add data/answer_cache.json here.
+data/*.tmp
 
 # --- Claude Code (local tooling state) ---
 .claude/
