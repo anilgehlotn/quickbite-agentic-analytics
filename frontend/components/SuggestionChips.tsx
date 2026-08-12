@@ -24,7 +24,10 @@
  * Cached questions are marked, which is honest rather than decorative: it tells
  * the reader why the answer appeared immediately. The marker is a word in the
  * card presentation and a dot with a title where space forbids it, so the
- * status is never carried by colour alone.
+ * status is never carried by colour alone. It appears only once the backend has
+ * confirmed the cache state; the questions themselves come from a build-time
+ * constant and are on screen before any request is made, so there is no loading
+ * state here to render.
  */
 
 import type { QuestionSuggestion } from "@/lib/types";
@@ -37,54 +40,27 @@ const FOCUS_RING =
 /**
  * Clickable prompts for the canonical questions.
  *
- * @param props.questions - The suggestions from the API.
+ * @param props.questions - The suggestions to render, seeded from the
+ *   build-time constant and reconciled with the API when it answers.
  * @param props.onSelect - Called with the full question text on click.
  * @param props.busy - Whether a request is in flight; disables the controls.
- * @param props.loading - Whether the suggestions are still being fetched.
  * @param props.compact - Render as a single scrollable line of chips.
  * @param props.cards - Render as a grid of cards, for the empty state.
- * @returns The rendered suggestions, or a placeholder while loading.
+ * @returns The rendered suggestions.
  */
 export default function SuggestionChips({
   questions,
   onSelect,
   busy,
-  loading,
   compact = false,
   cards = false,
 }: {
   questions: QuestionSuggestion[];
   onSelect: (question: string) => void;
   busy: boolean;
-  loading: boolean;
   compact?: boolean;
   cards?: boolean;
 }): JSX.Element | null {
-  if (loading) {
-    return cards ? (
-      <div
-        className="grid grid-cols-1 gap-3 sm:grid-cols-2"
-        aria-hidden="true"
-      >
-        {Array.from({ length: 6 }).map((_, index) => (
-          <span
-            key={index}
-            className="h-[5.25rem] animate-pulse-soft rounded-lg border border-border bg-surface"
-          />
-        ))}
-      </div>
-    ) : (
-      <div className="flex flex-wrap gap-2" aria-hidden="true">
-        {Array.from({ length: 6 }).map((_, index) => (
-          <span
-            key={index}
-            className="h-8 w-40 animate-pulse-soft rounded border border-border bg-surface"
-          />
-        ))}
-      </div>
-    );
-  }
-
   if (questions.length === 0) {
     return null;
   }

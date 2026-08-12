@@ -301,7 +301,7 @@ to provision and no build step on the host.
 
 ## Testing
 
-**809 tests**, all passing without any API key.
+**813 tests**, all passing without any API key.
 
 ### Ground truth is computed independently
 

@@ -176,15 +176,53 @@ and is not a fault.
 
 How the app handles it today:
 
-- `lib/api.ts` uses a **60 second timeout**, comfortably above the worst
-  observed cold start, so a waking backend resolves rather than aborting.
-- After 4 seconds without a response, the status card explains that the backend
-  may be waking and that the request has not failed. It never reports a false
-  outage while still waiting.
+- **The page does not wait for the backend to become usable.** The eight
+  suggestion cards come from `lib/questions.ts`, a build-time constant, so they
+  render and are clickable on first paint with no network call. A backend test
+  (`tests/test_frontend_contract.py`) fails if that constant drifts from the
+  backend's `CANONICAL_QUESTIONS`, so the cards cannot go stale silently.
+- **The wake starts on page load, not on the first click.** A health probe is
+  fired as soon as the page hydrates, with `preconnect` in the document head so
+  the TCP and TLS handshake is already done when it leaves. Each probe times
+  out after 10 seconds and is retried with exponential backoff for up to
+  **90 seconds** before the page reports the service offline. A cold start is
+  therefore never shown as an outage.
+- **The header says which is happening.** For the first 3 seconds the pill
+  reads `connecting`; after that it reads `waking the server`, and the empty
+  state explains that the free tier suspends when idle and the first request
+  can take up to a minute. That line sits in a fixed-height slot, so it
+  disappears without moving the cards below it.
+- **Asking during the wake works.** The input is never disabled by the
+  connection state. A question asked while the backend is booting is sent
+  immediately and held open by the **60 second timeout** in `lib/api.ts`,
+  comfortably above the worst observed cold start; the in-flight card says the
+  request is queued and waiting for the server rather than implying a failure.
 
-A keep-alive ping to hold the service warm is planned for a later step. Until
-then, if you are demonstrating the system live, load the page once a minute or
-two beforehand so the container is already awake.
+### The keep-alive, and why it is not enough on its own
+
+`.github/workflows/keepalive.yml` pings `/api/health` every **10 minutes**,
+inside the 15-minute idle window, and can also be run by hand from the Actions
+tab. It fails loudly if the `BACKEND_URL` repository variable is unset rather
+than passing silently against an empty URL.
+
+Treat it as a reduction in the odds of a cold start, not a guarantee:
+
+- **GitHub's scheduled runs are best-effort.** Cron triggers on shared runners
+  are routinely delayed by several minutes under load and can be dropped
+  entirely. A 10-minute schedule that slips past 15 lets the service suspend.
+- **Scheduled workflows are disabled after 60 days of repository inactivity.**
+  If this repository goes quiet, the pings stop without notice.
+
+If a cold start would be genuinely costly — a live demo, or a review window you
+cannot be present for — add a **second, independent pinger** as well. Any
+external uptime monitor on a 5-to-10-minute interval against
+`https://<render-url>/api/health` will do (UptimeRobot, Better Stack, Cronitor
+and similar all have free tiers that cover this). Two sources that fail
+independently are the cheapest insurance available here, and the endpoint is
+public, read-only and cheap to call.
+
+Failing all that, load the page once a minute or two before demonstrating, and
+let the wake finish while you are still talking.
 
 ---
 

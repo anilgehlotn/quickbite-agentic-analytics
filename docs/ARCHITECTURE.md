@@ -475,7 +475,7 @@ payload, using deliberately key-shaped fixtures.
 
 ## 9. Testing
 
-**809 tests**, all passing with no API keys configured.
+**813 tests**, all passing with no API keys configured.
 
 | Area | Tests | Area | Tests |
 |---|---:|---|---:|

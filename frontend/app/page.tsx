@@ -28,7 +28,14 @@ import {
   askQuestion,
   getCanonicalQuestions,
   getHealth,
+  HEALTH_PROBE_TIMEOUT_MS,
+  sleep,
+  WAKE_DEADLINE_MS,
+  WAKING_AFTER_MS,
+  wakeRetryDelay,
 } from "@/lib/api";
+import type { ConnectionPhase } from "@/lib/api";
+import { CANONICAL_QUESTIONS } from "@/lib/questions";
 import type {
   AnalysisResponse,
   HealthResponse,
@@ -37,6 +44,59 @@ import type {
 
 /** How often the in-flight elapsed timer ticks, in milliseconds. */
 const TICK_MS = 250;
+
+/**
+ * The suggestions as they are known before the backend answers.
+ *
+ * `cached` is false rather than true: every one of these is in fact warmed in
+ * the committed cache, but that is a property of the deployment this bundle is
+ * talking to, and claiming it unverified would be exactly the kind of
+ * confidently-wrong statement the rest of the system exists to avoid. The
+ * marker appears a moment later, when /api/questions confirms it.
+ */
+const INITIAL_SUGGESTIONS: QuestionSuggestion[] = CANONICAL_QUESTIONS.map(
+  (entry) => ({ ...entry, cached: false }),
+);
+
+/**
+ * Ask a question, holding the request open while the backend is still waking.
+ *
+ * The input is never disabled by the connection state, which means a question
+ * can be asked before the backend is listening at all. When that happens the
+ * browser fails the fetch immediately — a refused connection is not a slow
+ * one — and showing that as "the request did not complete" would be wrong
+ * twice over: nothing has failed, and the answer is seconds away.
+ *
+ * So a transport failure is retried on the same schedule and the same budget
+ * the health probe uses. The turn stays in its running state throughout, which
+ * is what queueing looks like from the reader's side.
+ *
+ * Only failures that never reached the server are retried. A 4xx, a 5xx or a
+ * rate limit means the backend answered and the answer was no; a timeout means
+ * it was already given a full minute. Those surface at once.
+ *
+ * @param question - The question to ask.
+ * @returns The analysis, once the backend produces one.
+ * @throws ApiError when the server answered with a failure, or when the wake
+ *   budget is exhausted without the server ever answering.
+ */
+async function askWhileWaking(question: string): Promise<AnalysisResponse> {
+  const deadline = Date.now() + WAKE_DEADLINE_MS;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await askQuestion(question);
+    } catch (caught) {
+      const neverReachedServer =
+        caught instanceof ApiError &&
+        caught.status === undefined &&
+        !caught.timedOut;
+      if (!neverReachedServer || Date.now() >= deadline) {
+        throw caught;
+      }
+      await sleep(wakeRetryDelay(attempt));
+    }
+  }
+}
 
 /** One entry in the conversation. */
 interface Turn {
@@ -133,15 +193,11 @@ function ErrorCard({
  * describing what actually happens when you ask, and nothing else competing
  * with them.
  *
- * @param props.hasSuggestions - Whether the questions loaded, which decides
- *   whether it is honest to tell the reader to pick one.
+ * @param props.waking - Whether the backend is still being woken, which adds
+ *   the explanation of why the first request may be slow.
  * @returns The rendered introduction.
  */
-function EmptyState({
-  hasSuggestions,
-}: {
-  hasSuggestions: boolean;
-}): JSX.Element {
+function EmptyState({ waking }: { waking: boolean }): JSX.Element {
   return (
     <section className="mx-auto max-w-3xl px-1 pb-10 pt-10 text-center sm:pb-14 sm:pt-16">
       <h1 className="text-balance text-[2rem] font-semibold leading-[1.1] tracking-[-0.028em] text-ink sm:text-display">
@@ -154,11 +210,32 @@ function EmptyState({
         the result means.
       </p>
       <p className="mt-4 text-sm text-faint">
-        Every step, including the exact SQL, is shown in the trace.{" "}
-        {hasSuggestions
-          ? "Pick a question below to start."
-          : "Type a question below to start."}
+        Every step, including the exact SQL, is shown in the trace. Pick a
+        question below to start.
       </p>
+
+      {/* The waking notice, in a slot whose height is reserved whether or not
+          it has anything in it. Reserving it is the point: this line appears a
+          few seconds after load and disappears again when the backend answers,
+          and without a fixed box the eight cards below would jump twice while
+          someone was reading them.
+          The two heights are measured, not guessed: the sentence wraps to
+          three lines at 380px (59px) and two at the `sm` breakpoint (39px),
+          where the paragraph is capped at max-w-xl rather than by the
+          viewport. Both reserves carry roughly a line of slack on top of that,
+          so a fallback font with wider metrics still fits rather than
+          reintroducing the shift this box exists to prevent. */}
+      <div
+        aria-live="polite"
+        className="mx-auto mt-4 flex min-h-[4.25rem] max-w-xl items-start justify-center sm:min-h-[3.25rem]"
+      >
+        {waking && (
+          <p className="text-xs leading-relaxed text-caution">
+            Waking the server. The free tier suspends it when idle, so the
+            first request can take up to a minute — you can ask now.
+          </p>
+        )}
+      </div>
     </section>
   );
 }
@@ -173,48 +250,83 @@ export default function Home(): JSX.Element {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [suggestions, setSuggestions] = useState<QuestionSuggestion[]>([]);
-  const [loadingSuggestions, setLoadingSuggestions] = useState(true);
+  const [suggestions, setSuggestions] =
+    useState<QuestionSuggestion[]>(INITIAL_SUGGESTIONS);
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [checkingHealth, setCheckingHealth] = useState(true);
+  const [phase, setPhase] = useState<ConnectionPhase>("checking");
 
   const nextId = useRef(0);
   const latestTurnRef = useRef<HTMLDivElement>(null);
 
+  // Wake the backend on first paint and keep probing until it answers.
+  //
+  // Nothing on the page waits for this. The cards are already rendered from a
+  // build-time constant and are already clickable; the probe exists so that a
+  // suspended service starts booting the moment the page opens rather than
+  // when someone finally clicks, and so the header can say which of those two
+  // things is happening.
+  useEffect(() => {
+    let cancelled = false;
+
+    // "connecting" is only honest for a moment. After that, silence from a
+    // free-tier host means it is booting, and saying so is better than a
+    // spinner that could equally mean broken.
+    const wakingTimer = setTimeout(() => {
+      if (!cancelled) {
+        setPhase((current) => (current === "checking" ? "waking" : current));
+      }
+    }, WAKING_AFTER_MS);
+
+    void (async () => {
+      const deadline = Date.now() + WAKE_DEADLINE_MS;
+      for (let attempt = 0; !cancelled; attempt += 1) {
+        try {
+          const payload = await getHealth(HEALTH_PROBE_TIMEOUT_MS);
+          if (!cancelled) {
+            setHealth(payload);
+            setPhase("connected");
+          }
+          return;
+        } catch {
+          // A failed probe during a cold start is the expected case, not an
+          // error: the service is not listening yet. Only the deadline
+          // distinguishes a boot from an outage.
+          if (Date.now() >= deadline) {
+            if (!cancelled) {
+              setHealth(null);
+              setPhase("offline");
+            }
+            return;
+          }
+          await sleep(wakeRetryDelay(attempt));
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(wakingTimer);
+    };
+  }, []);
+
+  // Reconcile the suggestion cards with the backend, in the background.
+  //
+  // The questions themselves are already on screen. This call adds the one
+  // thing the bundle cannot know — which are cached — and corrects the list in
+  // the unlikely event that a deployed backend disagrees with the build. A
+  // failure here changes nothing: the constant stands.
   useEffect(() => {
     let cancelled = false;
 
     void (async () => {
       try {
         const payload = await getCanonicalQuestions();
-        if (!cancelled) {
+        if (!cancelled && payload.questions.length > 0) {
           setSuggestions(payload.questions);
         }
       } catch {
-        // The chips are an accelerator, not a requirement; the input still
-        // works without them and the header will show the backend as offline.
-        if (!cancelled) {
-          setSuggestions([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingSuggestions(false);
-        }
-      }
-
-      try {
-        const payload = await getHealth();
-        if (!cancelled) {
-          setHealth(payload);
-        }
-      } catch {
-        if (!cancelled) {
-          setHealth(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setCheckingHealth(false);
-        }
+        // Keep the build-time list. The header reports the connection state,
+        // so a reader is not left to infer it from the cards.
       }
     })();
 
@@ -247,12 +359,21 @@ export default function Home(): JSX.Element {
       setBusy(true);
 
       try {
-        const response = await askQuestion(question);
+        const response = await askWhileWaking(question);
         setTurns((current) =>
           current.map((turn) =>
             turn.id === id ? { ...turn, response } : turn,
           ),
         );
+        // An answer proves the backend is up, which the probe loop may not
+        // have noticed yet — it can be mid-backoff. Without this the header
+        // would go on saying "waking the server" above a finished answer.
+        if (phase !== "connected") {
+          setPhase("connected");
+          void getHealth(HEALTH_PROBE_TIMEOUT_MS)
+            .then(setHealth)
+            .catch(() => undefined);
+        }
       } catch (caught) {
         const error =
           caught instanceof ApiError
@@ -265,7 +386,7 @@ export default function Home(): JSX.Element {
         setBusy(false);
       }
     },
-    [busy],
+    [busy, phase],
   );
 
   // Scroll the newest question to the top rather than scrolling to the input:
@@ -283,16 +404,23 @@ export default function Home(): JSX.Element {
 
   const latest = turns.length > 0 ? turns[turns.length - 1] : null;
   const traceResponse = latest?.response ?? null;
-  const showColdStartHint = busy && elapsed >= ANALYSIS_COLD_START_HINT_MS;
+  const waking = phase === "waking";
+  // The in-flight card follows "has the backend answered anything yet", not
+  // just the waking label: a request retrying against a server that has not
+  // responded is waiting for the server whether the probe currently calls that
+  // waking, checking or offline.
+  const serverPending = phase !== "connected";
+  // While the backend is known not to have answered there is no need to wait
+  // fifteen seconds to explain the delay: the reason is already established.
+  const showColdStartHint =
+    busy && (serverPending || elapsed >= ANALYSIS_COLD_START_HINT_MS);
 
   return (
     <div className="min-h-screen">
-      <Header health={health} checking={checkingHealth} />
+      <Header health={health} phase={phase} />
 
       <main className="mx-auto max-w-[92rem] px-5 pb-20 sm:px-8">
-        {turns.length === 0 && (
-          <EmptyState hasSuggestions={suggestions.length > 0} />
-        )}
+        {turns.length === 0 && <EmptyState waking={waking} />}
 
         <div
           className={`grid grid-cols-1 gap-10 lg:grid-cols-[1.62fr_1fr] ${
@@ -364,7 +492,9 @@ export default function Home(): JSX.Element {
                           className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-accent"
                         />
                         <p className="text-sm text-muted">
-                          Running the agent pipeline…
+                          {serverPending
+                            ? "Waiting for the server, then running the agent pipeline…"
+                            : "Running the agent pipeline…"}
                           <span className="ml-2 tabular-nums text-faint">
                             {(elapsed / 1000).toFixed(1)}s
                           </span>
@@ -372,10 +502,9 @@ export default function Home(): JSX.Element {
                       </div>
                       {showColdStartHint && (
                         <p className="mt-3 max-w-lg text-xs leading-relaxed text-faint">
-                          This is taking longer than usual. The backend runs on
-                          a free tier that suspends idle services, so the first
-                          request of the day can spend up to 50 seconds waking
-                          it. Nothing has failed yet.
+                          {serverPending
+                            ? "The question is queued and will run as soon as the backend answers. It is on a free tier that suspends idle services, so waking it takes up to 50 seconds. Nothing has failed."
+                            : "This is taking longer than usual. The backend runs on a free tier that suspends idle services, so the first request of the day can spend up to 50 seconds waking it. Nothing has failed yet."}
                         </p>
                       )}
                       <div className="mt-4 lg:hidden">
@@ -410,7 +539,11 @@ export default function Home(): JSX.Element {
                 />
               )}
               <div className="bg-canvas px-1 pb-5 pt-2">
-                {!checkingHealth && (
+                {/* Only once the connection has actually resolved. Showing the
+                    offline banner while the backend is merely booting would
+                    report an outage that is not happening, which is the exact
+                    failure this page is meant to avoid. */}
+                {(phase === "connected" || phase === "offline") && (
                   <ModeNotice
                     mode={health?.mode ?? "offline"}
                     cachedAnswers={health?.cached_answers ?? 0}
@@ -427,7 +560,6 @@ export default function Home(): JSX.Element {
                     questions={suggestions}
                     onSelect={(question) => void ask(question)}
                     busy={busy}
-                    loading={loadingSuggestions}
                     compact={turns.length > 0 && health?.mode === "full"}
                     // Cards only before the first question, where they are the
                     // primary call to action. Afterwards they collapse back to
