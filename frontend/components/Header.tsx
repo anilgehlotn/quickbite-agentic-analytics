@@ -9,40 +9,67 @@
  * a reader who does not know that will misread every figure.
  */
 
+import type { ConnectionPhase } from "@/lib/api";
 import type { HealthResponse } from "@/lib/types";
+
+/** What the pill says while the backend is still being reached. */
+const WAKING_LABEL = "waking the server";
 
 /**
  * The header bar.
  *
  * @param props.health - The backend health payload, when it has answered.
- * @param props.checking - Whether the health probe is still in flight.
+ * @param props.phase - How far the page has got in reaching the backend.
  * @returns The rendered header.
  */
 export default function Header({
   health,
-  checking,
+  phase,
 }: {
   health: HealthResponse | null;
-  checking: boolean;
+  phase: ConnectionPhase;
 }): JSX.Element {
   // The pill reports what the service can do, not merely whether it answered.
   // Saying "connected" while a banner two inches below explains that live
   // analysis is unavailable would be two truths that read as a contradiction.
-  const tone = checking
-    ? { dot: "bg-caution animate-pulse-soft", text: "text-muted", label: "connecting" }
-    : health === null
-      ? { dot: "bg-negative", text: "text-negative", label: "offline" }
-      : health.mode === "full"
-        ? { dot: "bg-positive", text: "text-muted", label: "connected" }
-        : health.mode === "cache_only"
-          ? { dot: "bg-caution", text: "text-caution", label: "cached answers only" }
-          : { dot: "bg-negative", text: "text-negative", label: "unavailable" };
+  //
+  // The label changes but the pill's box never does: it is a single inline row
+  // in a header whose height is set by the identity block beside it, so
+  // "connecting" becoming "waking the server" becoming "connected" moves
+  // nothing on the page.
+  const tone =
+    phase === "checking"
+      ? {
+          dot: "bg-caution animate-pulse-soft",
+          text: "text-muted",
+          label: "connecting",
+        }
+      : phase === "waking"
+        ? {
+            dot: "bg-caution animate-pulse-soft",
+            text: "text-caution",
+            label: WAKING_LABEL,
+          }
+        : phase === "offline" || health === null
+          ? { dot: "bg-negative", text: "text-negative", label: "offline" }
+          : health.mode === "full"
+            ? { dot: "bg-positive", text: "text-muted", label: "connected" }
+            : health.mode === "cache_only"
+              ? {
+                  dot: "bg-caution",
+                  text: "text-caution",
+                  label: "cached answers only",
+                }
+              : { dot: "bg-negative", text: "text-negative", label: "unavailable" };
 
   const title =
-    health === null
-      ? "The backend has not responded."
-      : `mode ${health.mode} · ${health.providers_configured.length} provider(s) ` +
-        `configured · ${health.cached_answers} cached answers · v${health.version}`;
+    phase === "waking"
+      ? "The backend is on a free tier that suspends when idle. Waking it " +
+        "takes up to a minute; the prepared questions are clickable now."
+      : health === null
+        ? "The backend has not responded."
+        : `mode ${health.mode} · ${health.providers_configured.length} provider(s) ` +
+          `configured · ${health.cached_answers} cached answers · v${health.version}`;
 
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-canvas">

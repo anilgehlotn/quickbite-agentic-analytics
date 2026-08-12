@@ -159,7 +159,7 @@ check the headline against `backend/tests/golden_answers.json`.
 
 ```bash
 cd backend
-python -m pytest tests/ -q            # expect 809 passed
+python -m pytest tests/ -q            # expect 813 passed
 python -m app.etl.quality_checks      # expect PASSED, 0 errors
 cd .. && python scripts/check_offline.py   # expect all 8 answered with no keys
 cd frontend && npm run lint && npm run build
