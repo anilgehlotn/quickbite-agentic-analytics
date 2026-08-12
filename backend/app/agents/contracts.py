@@ -305,14 +305,43 @@ class AnalysisPlan(BaseModel):
                 "dimensions": ["store_id", "month_key"],
                 "sub_queries": [
                     {
-                        "id": "store_monthly_revenue",
+                        "id": "consistently_declining_stores",
                         "purpose": (
-                            "Revenue per store per month, to find stores that "
-                            "fell in every consecutive month."
+                            "Return exactly the stores whose revenue fell in "
+                            "every consecutive month, computed in SQL by "
+                            "joining the monthly rows against each other, so "
+                            "the qualifying set is not left to be worked out "
+                            "by reading a table."
                         ),
                         "tables": ["mart_store_month"],
                         "metrics": ["revenue"],
+                        "dimensions": ["store_id"],
+                        "filters": {},
+                    },
+                    {
+                        "id": "store_monthly_revenue",
+                        "purpose": (
+                            "Revenue per store per month, so the shape of "
+                            "each decline can be shown rather than only its "
+                            "endpoints."
+                        ),
+                        "tables": ["mart_store_month"],
+                        "metrics": ["revenue", "orders", "aov"],
                         "dimensions": ["store_id", "month_key"],
+                        "filters": {},
+                    },
+                    {
+                        "id": "declining_store_baseline",
+                        "purpose": (
+                            "One row per store carrying window revenue, "
+                            "prior-period revenue and the change between "
+                            "them, to separate stores that are genuinely "
+                            "deteriorating from stores reverting after an "
+                            "unusually strong month."
+                        ),
+                        "tables": ["mart_store_month"],
+                        "metrics": ["revenue", "orders"],
+                        "dimensions": ["store_id"],
                         "filters": {},
                     },
                     {
@@ -331,10 +360,16 @@ class AnalysisPlan(BaseModel):
                 "requires_diagnostics": True,
                 "reasoning": (
                     "The question asks why, so a single revenue total is not "
-                    "enough. The first sub-query identifies which stores "
-                    "declined every month; the second attributes the decline "
-                    "to a channel. Orders and AOV separate a volume problem "
-                    "from a basket-size problem."
+                    "enough. The first sub-query settles which stores qualify, "
+                    "in SQL rather than by inspection. The second shows the "
+                    "shape of each decline month by month. The third compares "
+                    "each store against its own prior quarter, because a "
+                    "store falling from an unusually strong month may still "
+                    "be above its historical run rate and naming it as the "
+                    "top concern would be arithmetically correct and "
+                    "analytically wrong. The fourth attributes the fall to a "
+                    "channel, and orders against AOV separates a volume "
+                    "problem from a basket-size one."
                 ),
                 "confidence": 0.9,
             }

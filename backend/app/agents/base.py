@@ -94,6 +94,35 @@ class Agent(ABC, Generic[ResultT]):
         self._provider: str | None = None
         self._tokens: int = 0
 
+    @property
+    def provider(self) -> str | None:
+        """The provider that served the most recent model call.
+
+        Returns:
+            The provider name, or None when no call has been made.
+        """
+        return self._provider
+
+    @property
+    def tokens(self) -> int:
+        """Tokens consumed since usage was last reset.
+
+        Returns:
+            The accumulated token count.
+        """
+        return self._tokens
+
+    def reset_usage(self) -> None:
+        """Clear the recorded provider and token spend.
+
+        :meth:`run` calls this so every step reports only its own usage.
+        Callers that drive an agent outside :meth:`run` - the orchestrator
+        invokes :meth:`SQLAnalystAgent.run_many` directly - must call it
+        themselves, or one request's tokens leak into the next request's trace.
+        """
+        self._provider = None
+        self._tokens = 0
+
     def record_usage(self, provider: str, tokens: int) -> None:
         """Record the provider and token spend of one model call.
 
@@ -151,8 +180,7 @@ class Agent(ABC, Generic[ResultT]):
         Returns:
             The result and its trace step.
         """
-        self._provider = None
-        self._tokens = 0
+        self.reset_usage()
         started_at = datetime.now(timezone.utc)
         started = time.perf_counter()
 

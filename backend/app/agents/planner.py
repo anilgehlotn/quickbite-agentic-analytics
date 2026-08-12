@@ -59,22 +59,38 @@ PLANNING RULES
    - against the prior comparable period (is this a break in trend, or a
      return to normal after an unusually strong period?)
    Set time_window.comparison_start and comparison_end for that last one.
+   The baseline sub-query must return ONE ROW PER ENTITY carrying the window
+   total, the prior-period total and the change between them, aggregated in
+   SQL. Do not return the prior months as raw rows: a decline that is still
+   above its own prior quarter is a reverting store, not a deteriorating one,
+   and that distinction is lost if it has to be worked out by adding up
+   monthly rows by eye.
 
 4. TRENDS. Any trend or decline question must return the individual monthly values.
    Never return only the first and last month. A metric can fall from start to
    end while rising in the middle; those are different business situations and
    endpoints cannot distinguish them.
 
-5. UNSUPPORTED. If the question cannot be answered from this data - it asks
+5. IDENTIFY THE SET IN SQL. When the question asks WHICH entities did
+   something consistently - declined every month, grew every month, stayed
+   below a threshold - one sub-query must return exactly that set, computed in
+   SQL with a self-join or window functions over the monthly values. Do not
+   return every entity's monthly series and leave the qualifying set to be
+   worked out by reading it. Fifty stores across three months is a hundred and
+   fifty numbers, and a reader comparing them by eye will miss some. Keep the
+   full monthly series as a separate sub-query, per rule 4, so the answer can
+   still show the shape of each decline.
+
+6. UNSUPPORTED. If the question cannot be answered from this data - it asks
    about competitors, weather, staff, marketing spend, customer opinions, or
    anything in the future - set intent="unsupported", confidence below 0.3,
    and explain in reasoning what data would be needed. Do NOT invent a plan
    for a question the data cannot answer.
 
-6. METRICS. The metrics list may contain ONLY these names: {metric_names}.
+7. METRICS. The metrics list may contain ONLY these names: {metric_names}.
    Any other name is invalid and the plan will be rejected.
 
-7. BASELINES. When the question implies a comparison ("is it down?",
+8. BASELINES. When the question implies a comparison ("is it down?",
    "better than before?"), set the comparison window in time_window.
 """
 
