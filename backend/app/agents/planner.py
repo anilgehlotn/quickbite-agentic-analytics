@@ -48,6 +48,11 @@ PLANNING RULES
    - "revenue, orders and AOV" is ONE sub-query: three metrics, one grouping.
    - "top 5 AND bottom 5 stores" is TWO sub-queries: different orderings.
    - "compare X and Y" is usually one sub-query grouped by the dimension.
+   - An ambiguous superlative is TWO sub-queries, not a guess. "Sells the
+     most", "biggest", "best performing" can mean volume or value, and the
+     two give different answers: the highest-selling product by units is
+     usually not the highest by revenue. Rank both ways and let the answer
+     say which is which.
 
 3. DIAGNOSTIC QUESTIONS. Set requires_diagnostics=true whenever the question
    asks why, asks for a reason or cause, or asks about a decline, a drop or a
@@ -59,12 +64,17 @@ PLANNING RULES
    - against the prior comparable period (is this a break in trend, or a
      return to normal after an unusually strong period?)
    Set time_window.comparison_start and comparison_end for that last one.
-   The baseline sub-query must return ONE ROW PER ENTITY carrying the window
-   total, the prior-period total and the change between them, aggregated in
-   SQL. Do not return the prior months as raw rows: a decline that is still
-   above its own prior quarter is a reverting store, not a deteriorating one,
-   and that distinction is lost if it has to be worked out by adding up
-   monthly rows by eye.
+
+   The baseline sub-query must return ONE ROW PER ENTITY with the comparison
+   ALREADY COMPUTED as columns, not two result sets to be joined by reading:
+       window_revenue, baseline_revenue, delta_abs, delta_pct,
+       is_above_baseline   (1 when window_revenue > baseline_revenue, else 0)
+   State those column names in the sub-query's purpose. A decline that is
+   still above its own prior quarter is a reverting entity, not a
+   deteriorating one, and naming it as the top concern is arithmetically
+   correct and analytically wrong. Comparing two numbers across fifty rows is
+   exactly the step that gets silently mis-read, so SQL must do it and the
+   answer must only have to read the result.
 
 4. TRENDS. Any trend or decline question must return the individual monthly values.
    Never return only the first and last month. A metric can fall from start to
@@ -72,9 +82,12 @@ PLANNING RULES
    endpoints cannot distinguish them.
 
 5. IDENTIFY THE SET IN SQL. When the question asks WHICH entities did
-   something consistently - declined every month, grew every month, stayed
-   below a threshold - one sub-query must return exactly that set, computed in
-   SQL with a self-join or window functions over the monthly values. Do not
+   something consistently, or whether ANY did - "which stores declined every
+   month", "are any cities declining", "did anything grow every month" - one
+   sub-query must return exactly that set, computed in SQL with a self-join or
+   window functions over the monthly values. A yes/no question needs the set
+   just as much as a which question does: "are any cities declining" is
+   answered by the list, and an empty list is the answer "no". Do not
    return every entity's monthly series and leave the qualifying set to be
    worked out by reading it. Fifty stores across three months is a hundred and
    fifty numbers, and a reader comparing them by eye will miss some. Keep the

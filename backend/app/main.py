@@ -22,13 +22,25 @@ or, honouring the configured port::
 from __future__ import annotations
 
 import sqlite3
+import time
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Awaitable, Callable
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from app.api.routes import (
+    ErrorResponse,
+    RateLimitExceeded,
+    RETRY_AFTER_HEADER,
+    REQUEST_ID_HEADER,
+    new_request_id,
+    router,
+)
 from app.config import settings
+from app.core.cache import get_cache
 from app.core.logging import configure_logging, get_logger
 from app.semantic.schema import METRIC_DEFINITIONS, TABLE_ALLOWLIST, get_compact_schema
 
@@ -75,6 +87,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         Control back to the server for the lifetime of the application.
     """
     row_count, error = count_orders()
+    # Loading the cache at startup rather than on first request means a cold
+    # start pays the file read once, and the startup log states plainly how
+    # many questions are answerable without a provider.
+    cached = len(get_cache())
     logger.info(
         "startup",
         extra={
@@ -89,12 +105,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "providers_configured": settings.available_providers(),
             "cors_origins": settings.CORS_ORIGINS,
             "data_asof": settings.DATA_ASOF_DATE.isoformat(),
+            "cached_answers": cached,
         },
     )
     if error:
         logger.warning("database not readable; /health will report degraded")
     if not settings.available_providers():
-        logger.warning("no LLM provider keys configured")
+        logger.warning(
+            "no LLM provider keys configured; only cached answers are available",
+            extra={"cached_answers": cached},
+        )
     yield
     logger.info("shutdown")
 
@@ -112,6 +132,196 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_requests(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """Log every request with its outcome and duration.
+
+    The request id is generated here when the route did not supply one, and is
+    echoed in a header on every response, so a user reporting "it failed" can
+    quote an id that appears verbatim in the server logs.
+
+    Args:
+        request: The incoming request.
+        call_next: The rest of the middleware and routing stack.
+
+    Returns:
+        The response, with the correlation header attached.
+    """
+    request_id = request.headers.get(REQUEST_ID_HEADER) or new_request_id()
+    request.state.request_id = request_id
+    started = time.perf_counter()
+
+    response = await call_next(request)
+
+    duration_ms = (time.perf_counter() - started) * 1000
+    response.headers.setdefault(REQUEST_ID_HEADER, request_id)
+    logger.info(
+        "request",
+        extra={
+            "request_id": request_id,
+            "method": request.method,
+            "path": request.url.path,
+            "status": response.status_code,
+            "duration_ms": round(duration_ms, 1),
+        },
+    )
+    return response
+
+
+def error_payload(
+    request: Request, code: str, message: str, detail: Any | None = None
+) -> ErrorResponse:
+    """Build a structured error carrying the request's correlation id.
+
+    Args:
+        request: The request being answered.
+        code: Short machine-readable error code.
+        message: Plain-language explanation.
+        detail: Optional structured context.
+
+    Returns:
+        The error model.
+    """
+    return ErrorResponse(
+        error=code,
+        message=message,
+        request_id=getattr(request.state, "request_id", "unknown"),
+        detail=detail,
+    )
+
+
+@app.exception_handler(RateLimitExceeded)
+async def handle_rate_limit(
+    request: Request, exception: RateLimitExceeded
+) -> JSONResponse:
+    """Return 429 with a retry delay the client can act on.
+
+    Args:
+        request: The refused request.
+        exception: The limit that was hit.
+
+    Returns:
+        A structured 429 carrying Retry-After.
+    """
+    payload = error_payload(
+        request,
+        "rate_limited",
+        exception.message,
+        {"retry_after": exception.retry_after},
+    )
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content=payload.model_dump(),
+        headers={
+            RETRY_AFTER_HEADER: str(exception.retry_after),
+            REQUEST_ID_HEADER: payload.request_id,
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def handle_validation_error(
+    request: Request, exception: RequestValidationError
+) -> JSONResponse:
+    """Return 422 explaining what was wrong with the input.
+
+    FastAPI's default body is a bare list of pydantic errors. Wrapping it keeps
+    one response shape across the API and names the constraint in a sentence a
+    user can act on, while the raw errors stay available under ``detail``.
+
+    Args:
+        request: The rejected request.
+        exception: The validation failure.
+
+    Returns:
+        A structured 422.
+    """
+    payload = error_payload(
+        request,
+        "invalid_request",
+        (
+            f"The question must be between {settings.MIN_QUESTION_LENGTH} and "
+            f"{settings.MAX_QUESTION_LENGTH} characters and cannot be blank."
+        ),
+        exception.errors(),
+    )
+    logger.warning(
+        "request_invalid",
+        extra={"request_id": payload.request_id, "path": request.url.path},
+    )
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content=json_safe(payload.model_dump()),
+        headers={REQUEST_ID_HEADER: payload.request_id},
+    )
+
+
+@app.exception_handler(Exception)
+async def handle_unexpected(request: Request, exception: Exception) -> JSONResponse:
+    """Return a structured 500 instead of a traceback.
+
+    A stack trace in an HTTP response is both a poor user experience and an
+    information leak. The trace goes to the logs under the request id; the
+    caller gets that id and a sentence.
+
+    Args:
+        request: The failed request.
+        exception: The unhandled error.
+
+    Returns:
+        A structured 500.
+    """
+    payload = error_payload(
+        request,
+        "internal_error",
+        (
+            "The request could not be completed because of an unexpected "
+            "error. Quote the request id if you report this."
+        ),
+    )
+    logger.error(
+        "unhandled_exception",
+        extra={
+            "request_id": payload.request_id,
+            "path": request.url.path,
+            "error": str(exception),
+        },
+        exc_info=True,
+    )
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content=payload.model_dump(),
+        headers={REQUEST_ID_HEADER: payload.request_id},
+    )
+
+
+def json_safe(value: Any) -> Any:
+    """Coerce a payload into something ``json.dumps`` accepts.
+
+    Pydantic validation errors can carry exception instances and byte strings
+    under ``ctx``, which are not JSON-serializable; stringifying them keeps the
+    detail useful without failing the response.
+
+    Args:
+        value: The payload to coerce.
+
+    Returns:
+        The same structure with unserializable leaves stringified.
+    """
+    if isinstance(value, dict):
+        return {str(key): json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_safe(item) for item in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
+app.include_router(router)
 
 
 @app.get("/")

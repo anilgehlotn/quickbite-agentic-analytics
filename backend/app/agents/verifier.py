@@ -387,7 +387,82 @@ class VerifierAgent(Agent[VerificationReport]):
         checks.append(self._check_metrics_referenced(plan, results))
         checks.append(self._check_dates_in_range(results))
         checks.append(self._check_window_coverage(plan, results))
+        checks.append(self._check_dimension_coverage(plan, results))
         return checks
+
+    @staticmethod
+    def _check_dimension_coverage(
+        plan: AnalysisPlan, results: list[QueryResult]
+    ) -> VerificationCheck:
+        """Check that a breakdown covers all members of its dimension.
+
+        A query grouped by city that returns one city has answered a narrower
+        question than the one asked, and every figure in it is still correct -
+        which is why nothing else catches it. Seen live: a "revenue by city per
+        month" sub-query filtered itself down to a single city, and the answer
+        that followed could not have found a decline in any of the other seven.
+
+        Exempt: questions that asked for a top or bottom N, where a subset is
+        the point.
+
+        Args:
+            plan: The plan, whose question may state a top-N intent.
+            results: Every sub-query result.
+
+        Returns:
+            A warning-severity check naming the missing members.
+        """
+        if _TOP_N.search(plan.question):
+            return VerificationCheck(
+                name="dimension_coverage",
+                passed=True,
+                severity=WARNING,
+                message="The question asks for a subset, so partial coverage "
+                "of a dimension is expected.",
+                details=None,
+            )
+
+        offenders: list[dict[str, Any]] = []
+        blamed: list[str] = []
+        for result in _successful(results):
+            if not result.rows:
+                continue
+            for dimension, expected in _EXHAUSTIVE_DIMENSIONS.items():
+                if dimension not in result.columns:
+                    continue
+                distinct = {
+                    str(row.get(dimension))
+                    for row in result.rows
+                    if row.get(dimension) is not None
+                }
+                if 0 < len(distinct) < expected:
+                    offenders.append(
+                        {
+                            "sub_query_id": result.sub_query_id,
+                            "dimension": dimension,
+                            "found": len(distinct),
+                            "expected": expected,
+                        }
+                    )
+                    if result.sub_query_id not in blamed:
+                        blamed.append(result.sub_query_id)
+        return VerificationCheck(
+            name="dimension_coverage",
+            passed=not offenders,
+            severity=WARNING,
+            message=(
+                "Dimensional breakdowns cover every member of their dimension."
+                if not offenders
+                else f"{offenders[0]['sub_query_id']} groups by "
+                f"{offenders[0]['dimension']} but returns only "
+                f"{offenders[0]['found']} of {offenders[0]['expected']}, so "
+                f"the answer describes a subset of the business rather than "
+                f"all of it."
+            ),
+            details={"offenders": offenders, "sub_query_ids": blamed}
+            if offenders
+            else None,
+        )
 
     @staticmethod
     def _check_window_coverage(

@@ -36,6 +36,10 @@ _EXCEL_FILENAME: str = "QSR_Agentic_Insights_Dataset.xlsx"
 # repository so the application needs no external infrastructure to run.
 _DB_FILENAME: str = "quickbite.db"
 
+# Filename of the warmed answer cache. Committed to the repository so a
+# deployment can answer the evaluation questions with no provider available.
+_CACHE_FILENAME: str = "answer_cache.json"
+
 
 class Settings(BaseSettings):
     """Application settings for QuickBite Agentic Analytics.
@@ -124,6 +128,10 @@ class Settings(BaseSettings):
     EXCEL_PATH: Path = _DATA_DIR / _EXCEL_FILENAME
     DB_PATH: Path = _DATA_DIR / _DB_FILENAME
 
+    # Warmed answer cache, committed to the repository. It is what lets the
+    # eight evaluation questions be answered after every API key has expired.
+    CACHE_PATH: Path = _DATA_DIR / _CACHE_FILENAME
+
     # ------------------------------------------------------------------
     # LLM provider credentials
     # ------------------------------------------------------------------
@@ -199,6 +207,23 @@ class Settings(BaseSettings):
     # Safety rails for generated SQL.
     MAX_QUERY_ROWS: int = 1000
     QUERY_TIMEOUT_SECONDS: int = 10
+
+    # ------------------------------------------------------------------
+    # API limits
+    # ------------------------------------------------------------------
+    # A public URL in front of paid APIs needs a cost boundary. Cached answers
+    # are free and are deliberately exempt from both limits.
+
+    RATE_LIMIT_PER_MINUTE: int = 10
+    RATE_LIMIT_PER_DAY: int = 200
+
+    # Accepted question length. The lower bound rejects noise; the upper bound
+    # stops a pasted document becoming a prompt.
+    MIN_QUESTION_LENGTH: int = 3
+    MAX_QUESTION_LENGTH: int = 500
+
+    # Whether answers are cached and served from cache at all.
+    CACHE_ENABLED: bool = True
 
     # ------------------------------------------------------------------
     # Per-agent timeouts

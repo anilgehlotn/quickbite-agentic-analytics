@@ -412,6 +412,56 @@ async def test_a_silently_truncated_window_is_caught() -> None:
 
 
 @pytest.mark.asyncio
+async def test_a_breakdown_covering_one_city_of_eight_is_flagged() -> None:
+    """Answering about one city is not answering about the business.
+
+    The live failure: a "revenue by city per month" sub-query filtered itself
+    to a single city. Every figure it returned was correct, so no arithmetic
+    check could object, and the answer that followed could not have found a
+    decline in any of the other seven cities.
+    """
+    verifier = VerifierAgent(llm=FakeLLM())
+    rows = [
+        {"city": "Bengaluru", "month_key": month, "revenue_inr": 10.0}
+        for month in ("2026-05", "2026-06", "2026-07")
+    ]
+    report = await verifier.execute(make_plan(), [make_result("city_trend", rows)])
+
+    check = find(report, "dimension_coverage")
+    assert not check.passed
+    assert check.severity == WARNING
+    assert check.details["offenders"][0]["found"] == 1
+    assert "1 of 8" in check.message
+
+
+@pytest.mark.asyncio
+async def test_a_top_n_question_may_cover_part_of_a_dimension() -> None:
+    """A ranking is a subset by design and must not be flagged."""
+    verifier = VerifierAgent(llm=FakeLLM())
+    plan = make_plan(question="Which are the top 3 cities by revenue?")
+    rows = [
+        {"city": city, "revenue_inr": 10.0}
+        for city in ("Mumbai", "Delhi", "Pune")
+    ]
+    report = await verifier.execute(plan, [make_result("ranking", rows)])
+
+    assert find(report, "dimension_coverage").passed
+
+
+@pytest.mark.asyncio
+async def test_a_complete_channel_breakdown_passes_coverage() -> None:
+    """All four channels present is the normal case."""
+    verifier = VerifierAgent(llm=FakeLLM())
+    rows = [
+        {"channel": channel, "revenue_inr": 10.0}
+        for channel in settings.CHANNELS
+    ]
+    report = await verifier.execute(make_plan(), [make_result("by_channel", rows)])
+
+    assert find(report, "dimension_coverage").passed
+
+
+@pytest.mark.asyncio
 async def test_a_full_window_passes_coverage() -> None:
     """All three months present is the normal case."""
     verifier = VerifierAgent(llm=FakeLLM())
