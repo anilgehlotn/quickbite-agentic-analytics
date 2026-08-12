@@ -81,6 +81,40 @@ class Settings(BaseSettings):
     CHANNELS: list[str] = ["Dine-in", "Takeaway", "Swiggy", "Zomato"]
 
     # ------------------------------------------------------------------
+    # Seasonality
+    # ------------------------------------------------------------------
+    # Measured facts about the shipped extract, used to caveat month-to-month
+    # comparisons. Without them an agent reads any three-month fall as a
+    # deterioration, when part of it is the annual shape of the business.
+
+    SEASONAL_PEAK_MONTH: str = "2025-10"
+    SEASONAL_TROUGH_MONTH: str = "2026-02"
+
+    # Peak month revenue divided by trough month revenue.
+    SEASONAL_SPREAD: float = 1.36
+
+    # ------------------------------------------------------------------
+    # Verification bounds
+    # ------------------------------------------------------------------
+    # Sanity limits for agent-produced numbers. A figure outside these is not
+    # a surprising result, it is a broken query - a fan-out join or the wrong
+    # grain - so the verifier treats it as an error rather than a finding.
+
+    # Full-year revenue is about 13M INR, so nothing in this dataset can
+    # legitimately exceed this.
+    MAX_PLAUSIBLE_REVENUE_INR: float = 15_000_000.0
+
+    # AOV is derived, so revenue / orders must reproduce it to within this
+    # many INR. Wider than rounding, narrower than a real inconsistency.
+    AOV_TOLERANCE_INR: float = 0.5
+
+    # A breakdown's parts must sum to the reported total to within this.
+    TOTAL_RECONCILIATION_TOLERANCE_INR: float = 1.0
+
+    # Share and percentage columns must sum to 100 within this many points.
+    SHARE_SUM_TOLERANCE_PCT: float = 1.0
+
+    # ------------------------------------------------------------------
     # Paths
     # ------------------------------------------------------------------
     # Absolute, derived from this file's location at import time.
@@ -117,13 +151,25 @@ class Settings(BaseSettings):
     # failure that silently drops the provider out of the failover chain.
     ANTHROPIC_MODEL: str = "claude-opus-5"
     OPENAI_MODEL: str = "gpt-4o"
-    GEMINI_MODEL: str = "gemini-flash-latest"
+    # The lite alias rather than gemini-flash-latest: the latter currently
+    # resolves to a model whose free tier allows 20 requests per day, which one
+    # analysis exhausts in four questions. A deployment that a reviewer may
+    # open weeks from now needs headroom more than it needs the stronger model,
+    # and this is exactly the kind of thing an env override exists to correct.
+    GEMINI_MODEL: str = "gemini-flash-lite-latest"
     GROK_MODEL: str = "grok-4-latest"
 
     # Per-request budget and determinism. Analytics answers must be
     # reproducible, so the default temperature is 0.
     LLM_MAX_TOKENS: int = 4096
     LLM_TEMPERATURE: float = 0.0
+
+    # The insight agent writes the only long output in the system: a headline,
+    # a narrative, several findings, caveats and actions, plus a chart spec. On
+    # a diagnostic question that overruns the general budget, and a truncated
+    # reply is invalid JSON, which costs the whole narrative rather than its
+    # tail. This was observed in practice, not anticipated.
+    INSIGHT_MAX_TOKENS: int = 8192
 
     # Per-request timeout, and retry policy for transient provider failures.
     LLM_TIMEOUT_SECONDS: int = 60
@@ -153,6 +199,18 @@ class Settings(BaseSettings):
     # Safety rails for generated SQL.
     MAX_QUERY_ROWS: int = 1000
     QUERY_TIMEOUT_SECONDS: int = 10
+
+    # ------------------------------------------------------------------
+    # Per-agent timeouts
+    # ------------------------------------------------------------------
+    # A hung agent must not hang the request, so every stage is bounded
+    # independently. The analyst gets the largest budget because it may run
+    # several sub-queries concurrently, each with its own repair retry.
+
+    PLANNER_TIMEOUT_SECONDS: float = 45.0
+    ANALYST_TIMEOUT_SECONDS: float = 90.0
+    VERIFIER_TIMEOUT_SECONDS: float = 45.0
+    INSIGHT_TIMEOUT_SECONDS: float = 90.0
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

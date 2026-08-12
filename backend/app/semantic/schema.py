@@ -85,6 +85,11 @@ _FESTIVE_VALUES: Final[tuple[str, ...]] = (
     *settings.FESTIVE_PERIODS,
 )
 
+# Public alias. The verifier needs the cardinality of each exhaustively
+# partitioning dimension to know whether a breakdown is complete and should
+# therefore reconcile to a total, or is a top-N subset that must not.
+CITIES: Final[tuple[str, ...]] = _CITIES
+
 
 def _quoted(values: tuple[str, ...] | list[str]) -> str:
     """Render a vocabulary as a quoted, comma-separated list.

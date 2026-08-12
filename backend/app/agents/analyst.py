@@ -71,7 +71,13 @@ SQL RULES - violating any of these produces a wrong answer
    monthly trend and ranking questions. They are pre-aggregated and reconcile
    exactly with fact_orders.
 
-7. OUTPUT. Return ONLY the SQL. No explanation, no markdown fences, no
+7. MONTH_KEY IS 'YYYY-MM', NOT A DATE. Compare it only against 'YYYY-MM'
+   literals. month_key BETWEEN '2026-05-01' AND '2026-07-31' looks right and
+   silently drops every May row, because '2026-05' sorts before '2026-05-01'
+   as a string. Write month_key BETWEEN '2026-05' AND '2026-07'. Use full
+   dates only with order_date on fact_orders.
+
+8. OUTPUT. Return ONLY the SQL. No explanation, no markdown fences, no
    trailing semicolon. One statement.
 """
 
@@ -180,7 +186,12 @@ class SQLAnalystAgent(Agent[QueryResult]):
             cleaned = match.group(1).strip()
         return cleaned.rstrip(";").strip()
 
-    async def execute(self, sub_query: SubQuery, plan: AnalysisPlan) -> QueryResult:
+    async def execute(
+        self,
+        sub_query: SubQuery,
+        plan: AnalysisPlan,
+        feedback: str | None = None,
+    ) -> QueryResult:
         """Generate, validate and run SQL for one sub-query.
 
         Never raises for a query failure: an unanswerable sub-query returns a
@@ -190,6 +201,10 @@ class SQLAnalystAgent(Agent[QueryResult]):
         Args:
             sub_query: The piece of analysis to run.
             plan: The plan it belongs to.
+            feedback: Why a previous attempt at this sub-query was rejected,
+                appended to the first prompt. The orchestrator passes the
+                verifier's failure here when self-healing, so the model is
+                repairing a specific stated problem rather than retrying blind.
 
         Returns:
             The result, or a result carrying the error after all attempts.
@@ -197,7 +212,6 @@ class SQLAnalystAgent(Agent[QueryResult]):
         system = self.build_system_prompt()
         user = self.build_user_prompt(sub_query, plan)
 
-        feedback: str | None = None
         last_sql = ""
         last_error = "no attempt was made"
         started = time.perf_counter()
@@ -205,10 +219,14 @@ class SQLAnalystAgent(Agent[QueryResult]):
         for attempt in range(1, MAX_SQL_ATTEMPTS + 1):
             prompt = user
             if feedback is not None:
+                previous = (
+                    f"Your previous SQL was:\n{last_sql}\n\n" if last_sql else ""
+                )
                 prompt = (
                     f"{user}\n\n"
-                    f"Your previous SQL was:\n{last_sql}\n\n"
-                    f"It failed: {feedback}\n\n"
+                    f"{previous}"
+                    f"A previous attempt at this sub-query was rejected: "
+                    f"{feedback}\n\n"
                     f"Return corrected SQL that fixes exactly that problem."
                 )
 
@@ -290,7 +308,10 @@ class SQLAnalystAgent(Agent[QueryResult]):
         )
 
     async def run_many(
-        self, sub_queries: list[SubQuery], plan: AnalysisPlan
+        self,
+        sub_queries: list[SubQuery],
+        plan: AnalysisPlan,
+        feedback: str | None = None,
     ) -> list[QueryResult]:
         """Run several sub-queries concurrently.
 
@@ -301,6 +322,8 @@ class SQLAnalystAgent(Agent[QueryResult]):
         Args:
             sub_queries: The sub-queries to run.
             plan: The plan they belong to.
+            feedback: Optional rejection reason applied to every sub-query,
+                used by the orchestrator's self-healing retry.
 
         Returns:
             One result per sub-query, in input order.
@@ -309,7 +332,7 @@ class SQLAnalystAgent(Agent[QueryResult]):
             return []
 
         results = await asyncio.gather(
-            *(self.execute(sub_query, plan) for sub_query in sub_queries)
+            *(self.execute(sub_query, plan, feedback) for sub_query in sub_queries)
         )
         logger.info(
             "sub_queries_completed",
