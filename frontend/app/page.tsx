@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import AnswerCard from "@/components/AnswerCard";
 import Header from "@/components/Header";
+import ModeNotice from "@/components/ModeNotice";
 import QuestionInput from "@/components/QuestionInput";
 import SuggestionChips from "@/components/SuggestionChips";
 import TracePanel from "@/components/TracePanel";
@@ -371,6 +372,12 @@ export default function Home(): JSX.Element {
 
             <div className="sticky bottom-0 -mx-1 pt-8">
               <div className="bg-base/85 px-1 pb-4 pt-2 backdrop-blur">
+                {!checkingHealth && (
+                  <ModeNotice
+                    mode={health?.mode ?? "offline"}
+                    cachedAnswers={health?.cached_answers ?? 0}
+                  />
+                )}
                 <QuestionInput
                   value={draft}
                   onChange={setDraft}
@@ -383,7 +390,7 @@ export default function Home(): JSX.Element {
                     onSelect={(question) => void ask(question)}
                     busy={busy}
                     loading={loadingSuggestions}
-                    compact={turns.length > 0}
+                    compact={turns.length > 0 && health?.mode === "full"}
                   />
                 </div>
               </div>

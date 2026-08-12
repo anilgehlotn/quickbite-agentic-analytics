@@ -632,4 +632,69 @@ def test_no_provider_available_still_offers_the_cached_questions(
     payload = response.json()
     assert payload["answered"] is False
     assert "temporarily unavailable" in payload["error"]
-    assert "revenue" in payload["error"].lower()
+
+    # The refusal carries readable content, not just a reason: a headline, an
+    # explanation of what still works, and the questions that can be asked now.
+    insight = payload["insight"]
+    assert "temporarily unavailable" in insight["headline"]
+    assert "database" in insight["narrative"]
+    assert len(insight["key_findings"]) == 8
+    assert any("revenue" in question.lower() for question in insight["key_findings"])
+    assert payload["request_id"]
+
+
+def test_health_reports_cache_only_mode_without_a_provider(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The state the deployment is most likely to be found in is nameable.
+
+    Cache-only is not an outage: the data layer is healthy and the evaluation
+    questions answer instantly. Collapsing it into "degraded" would understate
+    what still works, so it gets its own mode.
+    """
+    # Cache one answer first: cache-only is precisely the state where there is
+    # something to serve. With nothing cached and no provider the honest mode
+    # is "offline", which the next test covers.
+    client.post("/api/ask", json={"question": QUESTION})
+    for key in (
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "GEMINI_API_KEY",
+        "GROK_API_KEY",
+    ):
+        monkeypatch.setattr(settings, key, None)
+
+    payload = client.get("/api/health").json()
+
+    assert payload["mode"] == "cache_only"
+    assert payload["degraded"] is True
+    assert payload["orchestrator_ready"] is False
+    assert payload["cached_answers"] == 1
+
+
+def test_health_reports_offline_when_nothing_can_be_answered(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No provider and an empty cache is a different, worse state."""
+    for key in (
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "GEMINI_API_KEY",
+        "GROK_API_KEY",
+    ):
+        monkeypatch.setattr(settings, key, None)
+
+    payload = client.get("/api/health").json()
+
+    assert payload["mode"] == "offline"
+    assert payload["degraded"] is True
+
+
+def test_health_reports_full_mode_when_a_provider_is_configured(
+    client: TestClient,
+) -> None:
+    """With a key present and the database readable, nothing is degraded."""
+    payload = client.get("/api/health").json()
+
+    assert payload["mode"] == "full"
+    assert payload["degraded"] is False

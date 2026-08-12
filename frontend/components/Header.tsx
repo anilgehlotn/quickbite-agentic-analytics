@@ -25,19 +25,24 @@ export default function Header({
   health: HealthResponse | null;
   checking: boolean;
 }): JSX.Element {
+  // The pill reports what the service can do, not merely whether it answered.
+  // Saying "connected" while a banner two inches below explains that live
+  // analysis is unavailable would be two truths that read as a contradiction.
   const tone = checking
     ? { dot: "bg-caution animate-pulse-soft", label: "connecting" }
     : health === null
       ? { dot: "bg-negative", label: "offline" }
-      : health.status === "ok"
+      : health.mode === "full"
         ? { dot: "bg-positive", label: "connected" }
-        : { dot: "bg-caution", label: "degraded" };
+        : health.mode === "cache_only"
+          ? { dot: "bg-caution", label: "cached answers only" }
+          : { dot: "bg-negative", label: "unavailable" };
 
   const title =
     health === null
       ? "The backend has not responded."
-      : `${health.providers_configured.length} provider(s) configured · ` +
-        `${health.cached_answers} cached answers · v${health.version}`;
+      : `mode ${health.mode} · ${health.providers_configured.length} provider(s) ` +
+        `configured · ${health.cached_answers} cached answers · v${health.version}`;
 
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-base/85 backdrop-blur">
