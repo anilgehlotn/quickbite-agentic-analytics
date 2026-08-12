@@ -151,6 +151,35 @@ _QUALIFYING_MARKERS: Final[tuple[str, ...]] = (
     "are any",
 )
 
+# Words describing a directional move over time. Only meaningful in
+# combination with a qualifying marker: a sub-query must be BOTH a membership
+# test AND about a decline before it is treated as the monotonic-decline set.
+# Requiring both is what keeps this off the monthly trend and baseline
+# sub-queries of the same plan, which describe declines too.
+_DIRECTIONAL_MARKERS: Final[tuple[str, ...]] = (
+    "declin",
+    "fell",
+    "fallen",
+    "falling",
+    "drop",
+    "decreas",
+    "worsen",
+    "deteriorat",
+    "slid",
+    "shrink",
+    "shrank",
+    "improv",
+    "grew",
+    "grow",
+    "rising",
+    "increas",
+)
+
+# Column name for the computed membership flag. Chosen to start with "is_" so
+# the insight agent's flag grouping picks it up automatically and hands the
+# model the membership lists rather than the rows to derive them from.
+DECLINE_FLAG_COLUMN: Final[str] = "is_strictly_declining"
+
 
 def window_months(start: date, end: date) -> list[str]:
     """List the month keys a window spans.
@@ -207,6 +236,27 @@ def is_qualifying_sub_query(sub_query: SubQuery) -> bool:
         from which membership could be derived.
     """
     return _describes(sub_query, _QUALIFYING_MARKERS)
+
+
+def is_monotonic_decline_sub_query(sub_query: SubQuery) -> bool:
+    """Whether a sub-query decides which members moved in one direction.
+
+    A stricter form of :func:`is_qualifying_sub_query`: the sub-query must be
+    both a membership test and about a directional move. Both conditions are
+    required so that the monthly trend and the baseline comparison of the same
+    diagnostic plan - which also talk about declines - keep their own
+    instructions.
+
+    Args:
+        sub_query: The sub-query to classify.
+
+    Returns:
+        True when it should return one row per member carrying a computed
+        decline flag.
+    """
+    return is_qualifying_sub_query(sub_query) and _describes(
+        sub_query, _DIRECTIONAL_MARKERS
+    )
 
 
 def is_trend_sub_query(sub_query: SubQuery) -> bool:
@@ -313,7 +363,44 @@ class SQLAnalystAgent(Agent[QueryResult]):
         # the query that decides "declined every consecutive month" mentions
         # both "consecutive" and "month", so it must be claimed as the
         # qualifying query before the trend rule can take it.
-        if is_qualifying_sub_query(sub_query):
+        if is_monotonic_decline_sub_query(sub_query):
+            months = window_months(window.start_date, window.end_date)
+            period_columns = [f"revenue_{month.replace('-', '_')}" for month in months]
+            comparisons = " AND ".join(
+                f"{later} < {earlier}"
+                for earlier, later in zip(period_columns, period_columns[1:])
+            )
+            lines.append(
+                "THIS DECIDES WHICH MEMBERS DECLINED. Return ONE ROW PER "
+                "MEMBER of the dimension - every member, not only the ones "
+                "that qualify - with these columns:\n"
+                f"  the dimension column, then {', '.join(period_columns)}, "
+                f"one per month in the window;\n"
+                f"  {DECLINE_FLAG_COLUMN}, which is 1 when the value fell in "
+                f"every consecutive month ({comparisons}) and 0 otherwise;\n"
+                "  change_abs and change_pct, last month minus first.\n"
+                "Use conditional aggregation over month_key to pivot the "
+                "months into columns, then compute the flag from those "
+                "columns. Restrict the test to the months listed above and no "
+                "others. The point of the flag is that the answer reads it "
+                "instead of comparing numbers across rows, so it must be a "
+                "real column in the output. If no member qualifies every flag "
+                "is 0, which is a complete and correct answer."
+            )
+            if has_comparison:
+                # Both flags on the same row, so "declining AND above its own
+                # baseline" is a column pair rather than an intersection of
+                # two result sets computed by hand. Without this the reverting
+                # members get named as the top concern, which is the specific
+                # mistake the baseline exists to prevent.
+                lines.append(
+                    "ALSO include on the same row: baseline_revenue (the same "
+                    "measure summed over the comparison window), delta_abs, "
+                    "delta_pct and is_above_baseline. A member can be "
+                    "declining every month and still be above its own "
+                    "baseline; both facts must be readable from one row."
+                )
+        elif is_qualifying_sub_query(sub_query):
             months = window_months(window.start_date, window.end_date)
             lines.append(
                 "THIS DECIDES WHICH ENTITIES QUALIFY. Return one row per "

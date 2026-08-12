@@ -87,7 +87,19 @@ PLANNING RULES
    sub-query must return exactly that set, computed in SQL with a self-join or
    window functions over the monthly values. A yes/no question needs the set
    just as much as a which question does: "are any cities declining" is
-   answered by the list, and an empty list is the answer "no". Do not
+   answered by the list, and an empty list is the answer "no".
+
+   This applies to EVERY dimension - city, store, channel, category, product -
+   and to improvement as well as decline. Whenever the question asks which
+   members of a dimension declined, fell, dropped, worsened, grew or improved
+   over consecutive periods, the plan MUST contain a sub-query whose purpose
+   says it identifies exactly those members and computes the test in SQL.
+   Word that purpose with both parts - the membership ("identify which cities
+   ...") and the direction ("... declined in every consecutive month") - so
+   the SQL agent knows which shape to produce. Never leave a membership test
+   to be inferred from a raw monthly breakdown: a reader comparing values
+   across a table will miss cases, and a question answered that way is wrong
+   in a way no arithmetic check can detect. Do not
    return every entity's monthly series and leave the qualifying set to be
    worked out by reading it. Fifty stores across three months is a hundred and
    fifty numbers, and a reader comparing them by eye will miss some. Keep the
