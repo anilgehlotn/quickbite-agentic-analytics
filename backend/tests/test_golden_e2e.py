@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sqlite3
 from pathlib import Path
 from typing import Any, Final
 
@@ -632,21 +633,6 @@ def test_q4_top_skus_by_quantity_and_revenue_match(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "KNOWN GAP, not a flaky test. The cached q5 answer leads with "
-        "'Bengaluru is the only city showing declining revenue', qualified in "
-        "the same sentence as being against its prior-quarter baseline - which "
-        "is true, and is a different test from the one the question implies. "
-        "Ground truth is that no city declined in every consecutive month, and "
-        "that is what the headline should lead with. The underlying cause is "
-        "that the plan for this question contains no sub-query computing the "
-        "monotonic-decline set, so the model is inferring it from 24 monthly "
-        "rows instead of reading it. Left visible rather than deleted or "
-        "weakened: it reports XPASS the moment the answer improves."
-    ),
-)
 def test_q5_reports_that_no_city_declined(
     answers: dict[str, AnalysisResponse],
 ) -> None:
@@ -655,6 +641,10 @@ def test_q5_reports_that_no_city_declined(
     Ground truth says zero cities declined in every consecutive month. A model
     asked "which cities are declining?" will reach for a name, so this asserts
     the headline does not supply one without immediately negating it.
+
+    This failed until the monotonic-decline set was computed in SQL rather
+    than inferred: the answer used to lead with the one city below its
+    prior-quarter baseline, which is a true statement about a different test.
     """
     response = answer_for(answers, "q5")
     assert GOLDEN["q5"]["declining_city_count"] == 0, "ground truth changed"
@@ -918,6 +908,76 @@ def test_q5_does_not_promote_a_baseline_decline_into_a_monotonic_one(
         "q5 names a declining city without saying on what basis; ground truth "
         "is that no city declined in every consecutive month"
     )
+
+
+def test_q8_states_the_reverter_split_explicitly(
+    answers: dict[str, AnalysisResponse],
+) -> None:
+    """The above/below-baseline split must be named, not gestured at.
+
+    Ground truth: four of the nine consistent decliners finished above their
+    own February-April baseline and five below. An answer that says "some of
+    these locations actually finished higher" has the right data and gives the
+    reader nothing to act on, which is how this regressed once already.
+    """
+    response = answer_for(answers, "q8")
+    assert response.insight is not None
+    text = insight_text(response)
+
+    above = {
+        store_id
+        for store_id in declining_stores()
+        if _window_exceeds_baseline(store_id)
+    }
+    below = set(declining_stores()) - above
+    assert len(above) == 4 and len(below) == 5, "ground truth changed"
+
+    named_below = {store for store in below if store.lower() in text}
+    assert len(named_below) >= 3, (
+        f"q8 names only {sorted(named_below)} of the five stores that are "
+        f"genuinely below baseline; the reader cannot tell which stores to act "
+        f"on"
+    )
+
+    quantified = any(
+        phrase in text
+        for phrase in ("four of", "4 of", "five of", "5 of", "four stores", "five stores")
+    )
+    assert quantified, (
+        "q8 does not quantify the split between stores that are above their "
+        "own baseline and those below it"
+    )
+
+
+def _window_exceeds_baseline(store_id: str) -> bool:
+    """Whether a store's window revenue exceeds its prior-period revenue.
+
+    Derived rather than hardcoded: the window total comes from the golden
+    answers and the prior-period total is summed from the database, which the
+    step-1.5 cross-check proved agrees with the golden path to within 1 INR.
+
+    Args:
+        store_id: The store to test.
+
+    Returns:
+        True when May-July revenue is above February-April revenue.
+    """
+    window = next(
+        store["window_revenue_inr"]
+        for store in GOLDEN["q8"]["stores"]
+        if store["store_id"] == store_id
+    )
+    prior_window = GOLDEN["q8"]["prior_window"]
+    connection = sqlite3.connect(f"file:{settings.DB_PATH}?mode=ro", uri=True)
+    try:
+        baseline = connection.execute(
+            "SELECT SUM(revenue_net) FROM mart_store_month "
+            "WHERE store_id = ? AND month_key BETWEEN ? AND ?",
+            (store_id, prior_window["start"][:7], prior_window["end"][:7]),
+        ).fetchone()[0]
+    finally:
+        connection.close()
+    return float(window) > float(baseline)
 
 
 def test_q8_separates_reverting_stores_from_deteriorating_ones(

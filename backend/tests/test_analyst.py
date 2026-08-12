@@ -15,9 +15,11 @@ from typing import Any
 import pytest
 
 from app.agents.analyst import (
+    DECLINE_FLAG_COLUMN,
     MAX_SQL_ATTEMPTS,
     SQLAnalystAgent,
     is_baseline_sub_query,
+    is_monotonic_decline_sub_query,
     is_trend_sub_query,
 )
 from app.agents.contracts import (
@@ -586,3 +588,126 @@ class TestSubQueryClassification:
         assert "THIS IS THE MONTHLY SERIES" in trend_prompt
         assert "is_above_baseline" not in trend_prompt
         assert "one row per entity per month" in trend_prompt
+
+
+# ---------------------------------------------------------------------------
+# Monotonic decline sets
+# ---------------------------------------------------------------------------
+
+
+class TestMonotonicDeclineClassification:
+    """A membership test over consecutive periods gets its own SQL shape.
+
+    Ground truth for "which cities declined over the last 3 months" is that
+    none did. An answer that has to derive that from 24 monthly rows gets it
+    wrong; an answer handed a flag column reads it.
+    """
+
+    def test_a_decline_membership_query_is_recognised(self) -> None:
+        """Both halves are required: membership and direction."""
+        assert is_monotonic_decline_sub_query(
+            SubQuery(
+                id="declining_cities",
+                purpose="Identify which cities declined in every consecutive month.",
+            )
+        )
+        assert is_monotonic_decline_sub_query(
+            SubQuery(
+                id="consistently_declining_stores",
+                purpose="Return exactly the stores that fell in every month.",
+            )
+        )
+
+    def test_it_applies_to_any_dimension_not_just_stores(self) -> None:
+        """City, channel and category are classified the same way."""
+        for dimension in ("cities", "channels", "categories", "products"):
+            assert is_monotonic_decline_sub_query(
+                SubQuery(
+                    id=f"declining_{dimension}",
+                    purpose=(
+                        f"Identify which {dimension} declined in every "
+                        f"consecutive month."
+                    ),
+                )
+            ), dimension
+
+    def test_improvement_questions_are_classified_too(self) -> None:
+        """The same shape answers "which grew every month"."""
+        assert is_monotonic_decline_sub_query(
+            SubQuery(
+                id="improving_stores",
+                purpose="Identify which stores improved in every consecutive month.",
+            )
+        )
+
+    def test_a_monthly_trend_is_not_a_decline_membership_query(self) -> None:
+        """This is the instruction-bleed guard.
+
+        A diagnostic plan's monthly trend sub-query talks about declines too.
+        It must keep returning its monthly series, or the trend disappears.
+        """
+        trend = SubQuery(
+            id="store_monthly_trend",
+            purpose=(
+                "Monthly revenue, orders and AOV per store to trace the "
+                "trajectory of each decline."
+            ),
+        )
+
+        assert not is_monotonic_decline_sub_query(trend)
+        assert is_trend_sub_query(trend)
+
+    def test_a_baseline_comparison_is_not_a_decline_membership_query(self) -> None:
+        """The baseline sub-query keeps its own column contract."""
+        baseline = SubQuery(
+            id="store_baseline",
+            purpose=(
+                "One row per store comparing the window against the prior "
+                "period baseline, showing which declined."
+            ),
+        )
+
+        assert not is_monotonic_decline_sub_query(baseline)
+        assert is_baseline_sub_query(baseline)
+
+    def test_the_prompt_asks_for_a_flag_column_and_every_member(
+        self, plan: AnalysisPlan
+    ) -> None:
+        """The contract is one row per member with a computed flag."""
+        agent = SQLAnalystAgent(llm=FakeLLM("SELECT 1"))
+        prompt = agent.build_user_prompt(
+            SubQuery(
+                id="declining_cities",
+                purpose="Identify which cities declined in every consecutive month.",
+            ),
+            plan,
+        )
+
+        assert "ONE ROW PER MEMBER" in prompt
+        assert DECLINE_FLAG_COLUMN in prompt
+        assert "revenue_2026_05" in prompt
+        assert "revenue_2026_06" in prompt
+        assert "revenue_2026_07" in prompt
+        assert "change_pct" in prompt
+        assert "every consecutive month" in prompt
+
+    def test_the_flag_column_is_named_for_automatic_grouping(self) -> None:
+        """It must start with is_ so the insight layer groups by it."""
+        assert DECLINE_FLAG_COLUMN.startswith("is_")
+
+    def test_the_trend_prompt_is_unchanged_by_the_new_category(
+        self, plan: AnalysisPlan
+    ) -> None:
+        """Verifying the fix did not contaminate the neighbouring sub-query."""
+        agent = SQLAnalystAgent(llm=FakeLLM("SELECT 1"))
+        prompt = agent.build_user_prompt(
+            SubQuery(
+                id="store_monthly_trend",
+                purpose="Monthly revenue per store for each month in the window.",
+            ),
+            plan,
+        )
+
+        assert "THIS IS THE MONTHLY SERIES" in prompt
+        assert DECLINE_FLAG_COLUMN not in prompt
+        assert "ONE ROW PER MEMBER" not in prompt

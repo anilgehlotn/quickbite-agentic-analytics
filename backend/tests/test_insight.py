@@ -29,7 +29,9 @@ from app.agents.insight import (
     InsightAgent,
     build_degraded_insight,
     choose_chart,
+    find_unsupported_identifiers,
     find_unsupported_numbers,
+    flag_summary,
     schema_without_examples,
     seasonality_context,
 )
@@ -544,3 +546,126 @@ def test_seasonality_context_comes_from_settings() -> None:
     assert settings.SEASONAL_PEAK_MONTH in text
     assert settings.SEASONAL_TROUGH_MONTH in text
     assert f"{settings.SEASONAL_SPREAD:.2f}x" in text
+
+
+# ---------------------------------------------------------------------------
+# Identifier traceability
+# ---------------------------------------------------------------------------
+
+
+STORE_ROWS: list[dict[str, Any]] = [
+    {"store_id": "ST007", "store_name": "QuickBite Kolkata 07", "revenue_inr": 44151.0},
+    {"store_id": "ST042", "store_name": "QuickBite Mumbai 42", "revenue_inr": 62345.0},
+]
+
+
+def test_a_mistyped_store_id_is_caught() -> None:
+    """ST07 is not ST007, and nothing numeric would notice.
+
+    From a live answer: the findings list had ST007, the headline had ST07.
+    """
+    results = [make_result(STORE_ROWS)]
+
+    assert find_unsupported_identifiers("Nine stores including ST07 declined.", results) == [
+        "ST07"
+    ]
+
+
+def test_correct_identifiers_are_not_flagged() -> None:
+    """Ids copied from the results pass unremarked."""
+    results = [make_result(STORE_ROWS)]
+
+    assert (
+        find_unsupported_identifiers("ST007 and ST042 both declined.", results) == []
+    )
+
+
+def test_an_identifier_embedded_in_a_name_is_not_flagged() -> None:
+    """A code that only appears inside a longer label still counts."""
+    results = [
+        make_result([{"store_name": "QuickBite ST099 Annexe", "revenue_inr": 1.0}])
+    ]
+
+    assert find_unsupported_identifiers("ST099 is the outlier.", results) == []
+
+
+def test_ordinary_prose_is_not_mistaken_for_an_identifier() -> None:
+    """The pattern must not fire on words, years or short codes."""
+    results = [make_result(STORE_ROWS)]
+
+    assert find_unsupported_identifiers("Revenue in 2026 rose in Q3 by 12%.", results) == []
+
+
+@pytest.mark.asyncio
+async def test_a_mistyped_identifier_becomes_a_caveat() -> None:
+    """The reader is told which id could not be found in the data."""
+    payload = good_payload(
+        headline="Store ST07 declined the most.",
+        key_findings=["Store ST07 declined the most."],
+    )
+    agent = InsightAgent(llm=FakeLLM(payload))
+    bundle = await agent.execute(make_plan(), [make_result(STORE_ROWS)])
+
+    assert bundle.unsupported_identifiers == ["ST07"]
+    assert any("ST07" in caveat for caveat in bundle.insight.caveats)
+
+
+@pytest.mark.asyncio
+async def test_the_prompt_forbids_reformatting_identifiers() -> None:
+    """The rule is stated, not only checked after the fact."""
+    llm = FakeLLM(good_payload())
+    agent = InsightAgent(llm=llm)
+    await agent.execute(make_plan(), [make_result(HEADLINE_ROWS)])
+
+    system = llm.calls[0]["system"]
+    assert "IDENTIFIERS ARE COPIED" in system
+    assert "ST007 is not ST07" in system
+
+
+# ---------------------------------------------------------------------------
+# Empty qualifying sets
+# ---------------------------------------------------------------------------
+
+
+def test_an_empty_qualifying_group_is_stated_explicitly() -> None:
+    """"None qualified" must be visible, not inferred from a missing key."""
+    result = make_result(
+        [
+            {"city": "Bengaluru", "is_strictly_declining": 0},
+            {"city": "Chennai", "is_strictly_declining": 0},
+        ]
+    )
+
+    summary = flag_summary(result)
+
+    assert summary["is_strictly_declining"]["1"] == []
+    assert set(summary["is_strictly_declining"]["0"]) == {"Bengaluru", "Chennai"}
+
+
+def test_a_populated_qualifying_group_lists_its_members() -> None:
+    """The membership list replaces the row-by-row comparison."""
+    result = make_result(
+        [
+            {"store_id": "ST007", "is_strictly_declining": 1},
+            {"store_id": "ST002", "is_strictly_declining": 1},
+            {"store_id": "ST004", "is_strictly_declining": 0},
+        ]
+    )
+
+    summary = flag_summary(result)
+
+    assert summary["is_strictly_declining"]["1"] == ["ST007", "ST002"]
+    assert summary["is_strictly_declining"]["0"] == ["ST004"]
+
+
+@pytest.mark.asyncio
+async def test_the_prompt_requires_leading_with_none_when_nothing_qualifies(
+) -> None:
+    """The rule that stops a weaker test being substituted for the answer."""
+    llm = FakeLLM(good_payload())
+    agent = InsightAgent(llm=llm)
+    await agent.execute(make_plan(), [make_result(HEADLINE_ROWS)])
+
+    system = llm.calls[0]["system"]
+    assert "FIRST SENTENCE must state that none met the criterion" in system
+    assert "Never lead with the weaker test" in system

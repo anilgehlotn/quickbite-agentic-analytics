@@ -103,6 +103,10 @@ _NUMBER = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")
 # Dates and month keys, whose digits are not figures to verify.
 _DATE_LIKE = re.compile(r"\d{4}-\d{2}(?:-\d{2})?")
 
+# Identifier shape: ST007, SKU005, and nothing else. Two or more digits keeps
+# it away from ordinary prose and from figures like "Q3".
+_IDENTIFIER = re.compile(r"\b[A-Z]{2,5}\d{2,6}\b")
+
 # Years the dataset spans, written bare in prose ("July 2026"). Only these two
 # are exempt, so a genuine figure that happens to be four digits is still
 # checked.
@@ -181,6 +185,13 @@ HOW TO ANALYSE
    "none of them" without checking every row. Your headline must agree with
    that column, and with your own narrative.
 
+   COUNT BOTH SIDES AND NAME THEM. When a result carries both a qualifying
+   flag and a baseline flag, report the split as numbers and names: "four of
+   the nine are still above their own prior quarter (A, B, C, D); the other
+   five are genuinely down (E, F, G, H, I)". "Several" and "some" are not
+   answers - the reader has to know which stores to act on and which to leave
+   alone, and that is the entire point of the comparison.
+
    Where a result carries a "flag_summary", that grouping was computed from
    the rows in code and is authoritative. Use its membership lists exactly as
    given: every name in the "1" group is above baseline, every name in the "0"
@@ -193,6 +204,23 @@ HOW TO ANALYSE
 8. "NONE" IS AN ANSWER. If no entity meets the stated criterion, say plainly
    that none does. Do not loosen the criterion to produce a non-empty list, and
    do not name the closest case as though it qualified.
+
+   Specifically: when a result carries a qualifying flag column and NO row has
+   the flag set, your FIRST SENTENCE must state that none met the criterion,
+   naming the criterion. That is a complete and correct answer; an empty set
+   is a finding, not a failure to find something. You may then add a weaker
+   comparison - a prior-period baseline, an endpoint change - but only AFTER
+   that sentence and only labelled as a different test, in the form "no city
+   declined in every consecutive month; on the weaker test of the full window
+   against the prior quarter, one city is down".
+   Never lead with the weaker test. Never let it stand in as the answer to the
+   question that was actually asked.
+
+11. IDENTIFIERS ARE COPIED, NEVER RETYPED. Store ids, SKU ids, store names and
+    every other identifier must be reproduced exactly as they appear in the
+    query results - ST007 is not ST07, SKU005 is not SKU5. Copy the characters
+    across; do not normalise, abbreviate, pad or shorten them. A mistyped
+    identifier sends someone to the wrong store.
 
 9. STATE CAVEATS. Seasonality, small samples, known data limitations, and the
    fact that revenue is tax-exclusive. A careful analyst states the limits of
@@ -215,12 +243,15 @@ class InsightBundle:
             was unavailable.
         unsupported_numbers: Figures in the narrative that could not be traced
             back to any query result.
+        unsupported_identifiers: Store, SKU or other ids in the narrative that
+            appear in no query result, and are therefore probably mistyped.
     """
 
     insight: Insight
     chart: ChartSpec
     degraded: bool = False
     unsupported_numbers: list[str] = field(default_factory=list)
+    unsupported_identifiers: list[str] = field(default_factory=list)
 
 
 def schema_without_examples(model: type[BaseModel]) -> dict[str, Any]:
@@ -444,9 +475,13 @@ def flag_summary(result: QueryResult) -> dict[str, dict[str, list[str]]]:
         values = {row.get(column) for row in result.rows}
         if not values <= {0, 1, True, False, None} or len(values - {None}) < 1:
             continue
-        groups: dict[str, list[str]] = {}
+        # Both groups are always present, even when one is empty. An absent
+        # "1" key reads as "no information about which members qualify"; an
+        # explicit empty list reads as "none of them do", which is the answer.
+        groups: dict[str, list[str]] = {"1": [], "0": []}
         for row in result.rows:
-            key = str(int(row[column])) if isinstance(row.get(column), (int, bool)) else "null"
+            value = row.get(column)
+            key = str(int(value)) if isinstance(value, (int, bool)) else "null"
             groups.setdefault(key, []).append(str(row.get(label_column)))
         summary[column] = {
             key: labels[:MAX_FLAG_LABELS] for key, labels in groups.items()
@@ -589,6 +624,48 @@ def find_unsupported_numbers(text: str, results: list[QueryResult]) -> list[str]
             and token not in unsupported
         ):
             unsupported.append(token)
+    return unsupported
+
+
+def find_unsupported_identifiers(
+    text: str, results: list[QueryResult]
+) -> list[str]:
+    """Find identifier-shaped tokens that no query result contains.
+
+    The same pattern as :func:`find_unsupported_numbers`, for the same reason:
+    a figure or an id that is nearly right is worse than one that is obviously
+    wrong, because nobody checks it. A live answer rendered ST007 as "ST07" -
+    correct in the findings list, wrong in the headline, and invisible to every
+    numeric check.
+
+    Matching is deliberately narrow: two to five capital letters followed by
+    two or more digits, which covers ST007 and SKU005 without catching ordinary
+    words or years.
+
+    Args:
+        text: The narrative to check.
+        results: Every sub-query result.
+
+    Returns:
+        The unsupported identifiers as written, in order of appearance.
+    """
+    known = {
+        str(value)
+        for result in results
+        for row in result.rows
+        for value in row.values()
+        if isinstance(value, str)
+    }
+    unsupported: list[str] = []
+    for match in _IDENTIFIER.finditer(text):
+        token = match.group(0)
+        if token in known or token in unsupported:
+            continue
+        # An id may legitimately appear inside a longer label, such as a store
+        # name that embeds its own code.
+        if any(token in value for value in known):
+            continue
+        unsupported.append(token)
     return unsupported
 
 
@@ -843,8 +920,31 @@ class InsightAgent(Agent[InsightBundle]):
                 degraded=True,
             )
 
-        checked_text = " ".join([insight.headline, *insight.key_findings])
-        unsupported = find_unsupported_numbers(checked_text, results)
+        checked_text = " ".join(
+            [insight.headline, insight.narrative, *insight.key_findings]
+        )
+        bad_identifiers = find_unsupported_identifiers(checked_text, results)
+        if bad_identifiers:
+            logger.warning(
+                "insight_identifiers_unsupported",
+                extra={"identifiers": bad_identifiers, "question": plan.question},
+            )
+            insight = insight.model_copy(
+                update={
+                    "caveats": [
+                        *insight.caveats,
+                        (
+                            f"The identifier(s) {', '.join(bad_identifiers)} do "
+                            f"not appear in the query results and may be "
+                            f"mistyped; check them against the data table."
+                        ),
+                    ]
+                }
+            )
+
+        unsupported = find_unsupported_numbers(
+            " ".join([insight.headline, *insight.key_findings]), results
+        )
         if unsupported:
             logger.warning(
                 "insight_numbers_unsupported",
@@ -881,7 +981,10 @@ class InsightAgent(Agent[InsightBundle]):
             )
 
         return InsightBundle(
-            insight=insight, chart=chart, unsupported_numbers=unsupported
+            insight=insight,
+            chart=chart,
+            unsupported_numbers=unsupported,
+            unsupported_identifiers=bad_identifiers,
         )
 
     def _parse(
