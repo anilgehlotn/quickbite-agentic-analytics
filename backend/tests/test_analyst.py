@@ -14,7 +14,12 @@ from typing import Any
 
 import pytest
 
-from app.agents.analyst import MAX_SQL_ATTEMPTS, SQLAnalystAgent
+from app.agents.analyst import (
+    MAX_SQL_ATTEMPTS,
+    SQLAnalystAgent,
+    is_baseline_sub_query,
+    is_trend_sub_query,
+)
 from app.agents.contracts import (
     AgentStatus,
     AnalysisPlan,
@@ -515,3 +520,69 @@ class TestInstrumentation:
         assert outcome.result is not None
         assert outcome.result.error is not None
         assert "Could not answer" in outcome.step.summary
+
+
+# ---------------------------------------------------------------------------
+# Sub-query classification
+# ---------------------------------------------------------------------------
+
+
+class TestSubQueryClassification:
+    """The prompt varies by sub-query kind, decided in code not by the model.
+
+    This exists because of a live regression: a baseline instruction meant for
+    one sub-query was appended to every sub-query of a diagnostic plan, the
+    monthly trend query came back as a second copy of the baseline query, and
+    the answer concluded that nothing had declined - from data that showed
+    nine stores declining every month.
+    """
+
+    def test_a_baseline_sub_query_is_recognised(self) -> None:
+        """The prior-period comparison is identified from its purpose."""
+        assert is_baseline_sub_query(
+            SubQuery(
+                id="store_baseline_comparison",
+                purpose="Compare the window against the prior period per store.",
+            )
+        )
+        assert is_baseline_sub_query(
+            SubQuery(id="x", purpose="Window revenue against baseline revenue.")
+        )
+
+    def test_a_monthly_series_is_not_a_baseline_query(self) -> None:
+        """A trend must not be collapsed into two period totals."""
+        trend = SubQuery(
+            id="store_monthly_trend",
+            purpose="Revenue per store for each month in the window.",
+        )
+
+        assert not is_baseline_sub_query(trend)
+        assert is_trend_sub_query(trend)
+
+    def test_a_month_key_dimension_marks_a_trend(self) -> None:
+        """The dimension hint counts even when the wording does not."""
+        assert is_trend_sub_query(
+            SubQuery(id="x", purpose="Revenue per store.", dimensions=["store_id", "month_key"])
+        )
+
+    def test_only_the_baseline_query_is_told_to_compute_the_comparison(
+        self, plan: AnalysisPlan
+    ) -> None:
+        """The instruction reaches one sub-query, not all of them."""
+        agent = SQLAnalystAgent(llm=FakeLLM("SELECT 1"))
+        plan.time_window.comparison_start = date(2026, 2, 1)
+        plan.time_window.comparison_end = date(2026, 4, 30)
+
+        baseline_prompt = agent.build_user_prompt(
+            SubQuery(id="baseline", purpose="Compare against the prior period."),
+            plan,
+        )
+        trend_prompt = agent.build_user_prompt(
+            SubQuery(id="trend", purpose="Revenue per store for each month."),
+            plan,
+        )
+
+        assert "is_above_baseline" in baseline_prompt
+        assert "THIS IS THE MONTHLY SERIES" in trend_prompt
+        assert "is_above_baseline" not in trend_prompt
+        assert "one row per entity per month" in trend_prompt

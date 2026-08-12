@@ -333,11 +333,14 @@ class AnalysisPlan(BaseModel):
                     {
                         "id": "declining_store_baseline",
                         "purpose": (
-                            "One row per store carrying window revenue, "
-                            "prior-period revenue and the change between "
-                            "them, to separate stores that are genuinely "
-                            "deteriorating from stores reverting after an "
-                            "unusually strong month."
+                            "One row per store with the baseline comparison "
+                            "already computed as columns: window_revenue, "
+                            "baseline_revenue, delta_abs, delta_pct and "
+                            "is_above_baseline. This separates stores that "
+                            "are genuinely deteriorating from stores "
+                            "reverting after an unusually strong month, "
+                            "without anyone having to compare two numbers "
+                            "across fifty rows."
                         ),
                         "tables": ["mart_store_month"],
                         "metrics": ["revenue", "orders"],
@@ -919,6 +922,13 @@ class AnalysisResponse(BaseModel):
     from_cache: bool = Field(
         default=False,
         description="True when this answer was served from cache.",
+    )
+    request_id: str | None = Field(
+        default=None,
+        description=(
+            "Correlation id for this request, matching the X-Request-ID header "
+            "and the server logs. Quotable when reporting a problem."
+        ),
     )
     error: str | None = Field(
         default=None,

@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import re
 import time
+from datetime import date
 from typing import Final
 
 from app.agents.base import Agent
@@ -77,9 +78,151 @@ SQL RULES - violating any of these produces a wrong answer
    as a string. Write month_key BETWEEN '2026-05' AND '2026-07'. Use full
    dates only with order_date on fact_orders.
 
-8. OUTPUT. Return ONLY the SQL. No explanation, no markdown fences, no
+8. BASELINE COMPARISONS. This rule applies ONLY to a sub-query whose purpose
+   is the prior-period comparison. It does not apply to a monthly trend
+   sub-query, which must still return one row per entity per month: collapsing
+   a trend into two period totals destroys the very thing a trend question
+   asks about. When this sub-query IS the baseline comparison, do not return
+   the two periods as separate rows for someone else to subtract. Return ONE
+   ROW PER ENTITY with the comparison already computed, using exactly these
+   aliases:
+       window_revenue, baseline_revenue, delta_abs, delta_pct,
+       is_above_baseline
+   where is_above_baseline is
+   CASE WHEN window_revenue > baseline_revenue THEN 1 ELSE 0 END.
+   Conditional aggregation over month_key gives both periods in one pass:
+   SUM(CASE WHEN month_key BETWEEN <window> THEN revenue_net ELSE 0 END).
+   A reader comparing two columns across fifty rows will misread one; a
+   computed column cannot be misread.
+
+   The baseline is a COLUMN, never a FILTER. If the sub-query identifies
+   entities by a pattern over months - "declined every month" - that pattern
+   alone decides membership. Do NOT also require the entity to be below its
+   baseline, or the answer silently reports a subset and the reverting
+   entities disappear from a question that asked about all of them.
+
+9. OUTPUT. Return ONLY the SQL. No explanation, no markdown fences, no
    trailing semicolon. One statement.
 """
+
+
+# Words that mark a sub-query as the prior-period comparison, and words that
+# mark it as the monthly series. Checked against the id and the purpose, which
+# the planner writes in business language.
+_BASELINE_MARKERS: Final[tuple[str, ...]] = (
+    "baseline",
+    "prior period",
+    "prior-period",
+    "prior quarter",
+    "previous period",
+    "period comparison",
+    "versus prior",
+    "against prior",
+)
+_TREND_MARKERS: Final[tuple[str, ...]] = (
+    "month",
+    "monthly",
+    "trend",
+    "trajectory",
+    "over time",
+    "per month",
+    "consecutive",
+)
+
+# Words that mark a sub-query as the one deciding WHICH entities qualify.
+# Checked before the trend markers, because the qualifying query for "declined
+# every consecutive month" contains "consecutive" and "month" and would
+# otherwise be told to return the raw monthly series - which is exactly the
+# work it exists to avoid.
+_QUALIFYING_MARKERS: Final[tuple[str, ...]] = (
+    "identify",
+    "exactly the",
+    "exactly those",
+    "qualify",
+    "qualifying",
+    "which stores",
+    "which cities",
+    "which products",
+    "declined every",
+    "fell in every",
+    "every consecutive",
+    "consistently declin",
+    "strictly declin",
+    "are any",
+)
+
+
+def window_months(start: date, end: date) -> list[str]:
+    """List the month keys a window spans.
+
+    Args:
+        start: First date of the window.
+        end: Last date of the window.
+
+    Returns:
+        Month keys in 'YYYY-MM' form, in order.
+    """
+    months: list[str] = []
+    year, month = start.year, start.month
+    while (year, month) <= (end.year, end.month):
+        months.append(f"{year:04d}-{month:02d}")
+        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+    return months
+
+
+def _describes(sub_query: SubQuery, markers: tuple[str, ...]) -> bool:
+    """Test a sub-query's id and purpose against a set of markers.
+
+    Args:
+        sub_query: The sub-query to classify.
+        markers: Lowercase substrings to look for.
+
+    Returns:
+        True when any marker appears.
+    """
+    text = f"{sub_query.id} {sub_query.purpose}".lower()
+    return any(marker in text for marker in markers)
+
+
+def is_baseline_sub_query(sub_query: SubQuery) -> bool:
+    """Whether a sub-query is the prior-period comparison.
+
+    Args:
+        sub_query: The sub-query to classify.
+
+    Returns:
+        True when its purpose is comparing the window against a baseline.
+    """
+    return _describes(sub_query, _BASELINE_MARKERS)
+
+
+def is_qualifying_sub_query(sub_query: SubQuery) -> bool:
+    """Whether a sub-query decides which entities meet a criterion.
+
+    Args:
+        sub_query: The sub-query to classify.
+
+    Returns:
+        True when it should return the membership set rather than the data
+        from which membership could be derived.
+    """
+    return _describes(sub_query, _QUALIFYING_MARKERS)
+
+
+def is_trend_sub_query(sub_query: SubQuery) -> bool:
+    """Whether a sub-query is the monthly series.
+
+    A sub-query that is both is treated as a baseline comparison, because the
+    baseline test is checked first at the call site; the trend then belongs in
+    its own sub-query, which is what the planner is told to produce.
+
+    Args:
+        sub_query: The sub-query to classify.
+
+    Returns:
+        True when it should return one row per period.
+    """
+    return _describes(sub_query, _TREND_MARKERS) or "month_key" in sub_query.dimensions
 
 
 class SQLAnalystAgent(Agent[QueryResult]):
@@ -154,10 +297,51 @@ class SQLAnalystAgent(Agent[QueryResult]):
             f"Time window: {window.start_date.isoformat()} to "
             f"{window.end_date.isoformat()} ({window.label})",
         ]
-        if window.comparison_start and window.comparison_end:
+        has_comparison = bool(window.comparison_start and window.comparison_end)
+        if has_comparison:
             lines.append(
                 f"Comparison window: {window.comparison_start.isoformat()} to "
                 f"{window.comparison_end.isoformat()}"
+            )
+
+        # Which instruction is appended is decided here, in code, rather than
+        # left to the model to infer from the plan. Stating the baseline rule
+        # on every sub-query of a diagnostic plan was not a harmless
+        # over-instruction: it turned the monthly trend query into a second
+        # copy of the baseline query, the monthly series vanished, and the
+        # answer concluded that nothing had declined. The order matters too -
+        # the query that decides "declined every consecutive month" mentions
+        # both "consecutive" and "month", so it must be claimed as the
+        # qualifying query before the trend rule can take it.
+        if is_qualifying_sub_query(sub_query):
+            months = window_months(window.start_date, window.end_date)
+            lines.append(
+                "THIS DECIDES WHICH ENTITIES QUALIFY. Return one row per "
+                "qualifying entity and nothing else, with the test itself "
+                "computed in SQL - self-joins on month_key, or window "
+                "functions over the monthly values. Returning every entity's "
+                "monthly rows and leaving the test to the reader is the "
+                "failure this instruction exists to prevent. If no entity "
+                "qualifies, return no rows: that is a valid answer.\n"
+                f"Apply the test across EXACTLY these months and no others: "
+                f"{', '.join(months)}. The comparison window belongs to the "
+                f"baseline sub-query and must not be folded into this test - "
+                f"extending the run of months makes the criterion stricter "
+                f"than the question asked and silently returns nothing."
+            )
+        elif has_comparison and is_baseline_sub_query(sub_query):
+            lines.append(
+                "THIS IS THE BASELINE COMPARISON. Return one row per entity "
+                "with window_revenue, baseline_revenue, delta_abs, delta_pct "
+                "and is_above_baseline computed in SQL. Do not return "
+                "per-month rows."
+            )
+        elif is_trend_sub_query(sub_query):
+            lines.append(
+                "THIS IS THE MONTHLY SERIES. Return one row per entity per "
+                "month, including month_key. Do NOT collapse the months into "
+                "period totals, and do not add baseline comparison columns "
+                "here."
             )
         if sub_query.metrics:
             lines.append(f"Metrics: {', '.join(sub_query.metrics)}")

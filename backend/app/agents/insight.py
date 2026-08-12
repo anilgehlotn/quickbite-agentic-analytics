@@ -58,6 +58,10 @@ logger = get_logger(__name__)
 # improves.
 MAX_ROWS_IN_PROMPT: Final[int] = 60
 
+# Entity labels listed per flag group. Enough to name every store in the
+# estate; beyond this the group is a population, not a list.
+MAX_FLAG_LABELS: Final[int] = 50
+
 # Confidence assigned to a deterministically built insight. The numbers are
 # exact but nothing has interpreted them, so it must not look authoritative.
 DEGRADED_CONFIDENCE: Final[float] = 0.3
@@ -168,6 +172,20 @@ HOW TO ANALYSE
    still be running above its own historical rate. Naming that store as the top
    concern is arithmetically correct and analytically wrong. If a baseline is
    present, you MUST separate genuine decliners from reverters.
+
+   READ THE COMPARISON, DO NOT REDO IT. When a result already carries the
+   comparison as a column - is_above_baseline, delta_abs, delta_pct, or any
+   precomputed flag - that column IS the answer. Take it literally, row by
+   row. Never re-derive it by eyeballing two other columns, never override it
+   with your own impression, and never generalise it into "all of them" or
+   "none of them" without checking every row. Your headline must agree with
+   that column, and with your own narrative.
+
+   Where a result carries a "flag_summary", that grouping was computed from
+   the rows in code and is authoritative. Use its membership lists exactly as
+   given: every name in the "1" group is above baseline, every name in the "0"
+   group is below it. Do not move a name between groups, and make sure any
+   count you state matches the size of the list you were handed.
 
 7. SEPARATE SPECIFIC FROM MARKET-WIDE. If the surrounding city or the business
    as a whole moved the same way, the cause is not that store. Say so.
@@ -380,6 +398,60 @@ def choose_chart(plan: AnalysisPlan, results: list[QueryResult]) -> ChartSpec:
             title=f"{measures[0]} by {labels[0]}, {plan.time_window.label}",
         )
     return none_chart
+
+
+def flag_summary(result: QueryResult) -> dict[str, dict[str, list[str]]]:
+    """Group entity labels by the value of each boolean flag column.
+
+    The last mile of the baseline problem. Even with ``is_above_baseline``
+    computed in SQL and stated as a rule, a live run still put a store with
+    ``is_above_baseline = 0`` into the "above baseline" list, because the model
+    was reading nine rows and assigning them by hand. Grouping the rows here
+    removes the step: what reaches the prompt is the membership itself, not the
+    evidence for it.
+
+    A flag column is one whose name reads as a predicate and whose values are
+    exactly two-valued booleans or 0/1.
+
+    Args:
+        result: The result to summarise.
+
+    Returns:
+        A mapping of flag column to value to the entity labels carrying it.
+        Empty when the result has no flag column or nothing to label rows by.
+    """
+    if not result.rows:
+        return {}
+    label_column = next(
+        (
+            column
+            for column in result.columns
+            if _is_label_column(column, result.rows)
+        ),
+        None,
+    )
+    if label_column is None:
+        return {}
+
+    summary: dict[str, dict[str, list[str]]] = {}
+    for column in result.columns:
+        lowered = column.lower()
+        if not (
+            lowered.startswith(("is_", "has_", "was_"))
+            or lowered.endswith("_flag")
+        ):
+            continue
+        values = {row.get(column) for row in result.rows}
+        if not values <= {0, 1, True, False, None} or len(values - {None}) < 1:
+            continue
+        groups: dict[str, list[str]] = {}
+        for row in result.rows:
+            key = str(int(row[column])) if isinstance(row.get(column), (int, bool)) else "null"
+            groups.setdefault(key, []).append(str(row.get(label_column)))
+        summary[column] = {
+            key: labels[:MAX_FLAG_LABELS] for key, labels in groups.items()
+        }
+    return summary
 
 
 def _result_numbers(results: list[QueryResult]) -> list[float]:
@@ -704,6 +776,11 @@ class InsightAgent(Agent[InsightBundle]):
                     "rows": result.rows[:MAX_ROWS_IN_PROMPT],
                     "truncated": result.row_count > MAX_ROWS_IN_PROMPT,
                     "error": result.error,
+                    **(
+                        {"flag_summary": summary}
+                        if (summary := flag_summary(result))
+                        else {}
+                    ),
                 }
                 for result in results
             ],
