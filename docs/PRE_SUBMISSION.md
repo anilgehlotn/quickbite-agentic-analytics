@@ -11,7 +11,7 @@ result you have to guess at is not a check.
 
 ## 1. Both URLs respond
 
-- [ ] **Backend health.** `curl https://<render-url>/api/health`
+- [ ] **Backend health.** `curl https://quickbite-analytics-api.onrender.com/api/health`
       Expect HTTP 200 and a body containing `"status": "ok"`,
       `"database_ready": true`, `"fact_orders_rows": 20000` and
       `"data_asof": "2026-07-31"`.
@@ -24,7 +24,7 @@ result you have to guess at is not a check.
       the eight canonical answers plus thirteen written by live testing during
       Module 9. Extra entries are harmless (they make more questions instant
       and provider-free), but see section 8 before shipping.
-- [ ] **Provider health.** `curl https://<render-url>/api/providers` shows
+- [ ] **Provider health.** `curl https://quickbite-analytics-api.onrender.com/api/providers` shows
       `providers_healthy` non-empty if any key is funded. A provider listed in
       `providers_in_cooldown` with a non-zero `cooldown_remaining_seconds` is
       the circuit breaker working, not a fault; `last_failure` says why.
@@ -111,7 +111,7 @@ check the headline against `backend/tests/golden_answers.json`.
       genuine leak.
 - [ ] `.env` is **not** tracked: `git ls-files backend/.env` prints nothing.
 - [ ] `backend/.env.example` contains placeholders only, no real values.
-- [ ] `curl https://<render-url>/api/health | grep -Ei "sk-|AIza|xai-"` returns
+- [ ] `curl https://quickbite-analytics-api.onrender.com/api/health | grep -Ei "sk-|AIza|xai-"` returns
       nothing — the endpoint reports which providers are *configured*, never
       their keys.
 - [ ] Skim the Render logs for the deploy: no key material, no tracebacks
@@ -127,9 +127,15 @@ check the headline against `backend/tests/golden_answers.json`.
 
 ## 8. Repository presentation
 
-- [ ] README live-application, API and demo-video links are filled in — the
-      placeholders are the easiest thing in this list to forget.
-- [ ] The demo video plays from a private window.
+- [ ] **The three README links open.** They are filled in, so the risk is no
+      longer a forgotten placeholder but a link that resolves for you and not
+      for a stranger. Check each from a private window:
+      - <https://quickbite-agentic-analytics.vercel.app>
+      - <https://quickbite-analytics-api.onrender.com>
+      - <https://drive.google.com/drive/folders/1deZuT6HP__SPFqAJHvHHBWLCWxX0Jt3_?usp=sharing>
+- [ ] **The Drive folder is shared with anyone holding the link**, and the
+      video inside it plays without a Google sign-in. A folder set to
+      "restricted" looks fine to its owner and is a dead end to everyone else.
 - [ ] `docs/DEPLOYMENT.md` matches what was actually deployed.
 - [ ] `docs/Agent_Architecture.pdf` regenerated from `docs/ARCHITECTURE.md`
       (`python scripts/build_architecture_pdf.py`) and opens cleanly.
